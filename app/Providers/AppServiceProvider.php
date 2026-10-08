@@ -18,10 +18,13 @@ use App\Policies\LeadFollowupPolicy;
 use App\Policies\LeadPolicy;
 use App\Policies\RecurringInvoiceTemplatePolicy;
 use App\Policies\ServicePolicy;
+use App\Policies\RolePolicy;
+use App\Policies\UserPolicy;
 use App\Rbac\Rbac;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -64,6 +67,17 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(RecurringInvoiceTemplate::class, RecurringInvoiceTemplatePolicy::class);
         Gate::policy(LeadFollowup::class, LeadFollowupPolicy::class);
         Gate::policy(ExpenseCategory::class, ExpenseCategoryPolicy::class);
+        Gate::policy(\App\Models\User::class, UserPolicy::class);
+        Gate::policy(Role::class, RolePolicy::class);
+
+        /*
+         | Role abilities that take a Role argument. Spatie's Role is not an
+         | Eloquent model of ours, so Gate::policy() cannot infer the argument
+         | types; these explicit definitions tell it what to inject. Without
+         | them the controller's authorize('update', $role) fails to resolve.
+         */
+        Gate::define('update', [RolePolicy::class, 'update']);
+        Gate::define('view', [RolePolicy::class, 'view']);
     }
 
     /**
