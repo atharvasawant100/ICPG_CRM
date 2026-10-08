@@ -27,8 +27,15 @@ trait AssignsRoles
     {
         $roleName = $role instanceof Role ? $role->name : (string) $role;
 
-        // Spatie: source of truth.
-        $this->assignRole($roleName);
+        /*
+         | Spatie: source of truth.
+         |
+         | syncRoles() replaces rather than adds, so the user ends up holding
+         | exactly one role. assignRole() would add, leaving a user with both
+         | e.g. sales and development, which breaks the single-role hierarchy
+         | the admin UI and getRoleNames()->first() both assume.
+         */
+        $this->syncRoles([$roleName]);
 
         if ($syncLegacyColumn) {
             $this->forceFill(['role' => $roleName])->saveQuietly();

@@ -5,6 +5,7 @@ namespace App\Rbac;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Resolves and applies the "own / team / all" data scope.
@@ -52,6 +53,42 @@ final class DataScope
     }
 
     /**
+     * The scope a role has for a module.
+     *
+     * Resolution order:
+     *   1. role_module_scopes (the DB, managed from the Roles screen)
+     *   2. config/rbac.php    (fallback, keeps working if the table is empty)
+     *   3. null               (caller falls back to default_scope)
+     */
+    public static function scopeForRole(string $role, string $module): ?string
+    {
+        try {
+            $stored = DB::table('role_module_scopes')
+                ->where('role_name', $role)
+                ->where('module', $module)
+                ->value('scope');
+
+            if (is_string($stored) && in_array($stored, [self::OWN, self::TEAM, self::ALL], true)) {
+                return $stored;
+            }
+        } catch (\Throwable) {
+            // Table missing or unreachable: fall through to config.
+        }
+
+        $map = config("rbac.scopes.{$role}");
+
+        if (is_array($map)) {
+            $scope = $map[$module] ?? $map['default'] ?? null;
+
+            if (is_string($scope) && in_array($scope, [self::OWN, self::TEAM, self::ALL], true)) {
+                return $scope;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The scope a user has for a module.
      */
     public static function scopeFor(?User $user, string $module): string
@@ -69,14 +106,8 @@ final class DataScope
         $best = $rank[$resolved] ?? 1;
 
         foreach ($user->getRoleNames() as $role) {
-            $map = config("rbac.scopes.{$role}");
-
-            if (! is_array($map)) {
-                continue;
-            }
-
-            // A role may pin one module and defer the rest to its own default.
-            $scope = $map[$module] ?? $map['default'] ?? null;
+            // DB first, config as fallback (see scopeForRole()).
+            $scope = self::scopeForRole($role, $module);
 
             if (! is_string($scope) || ! isset($rank[$scope])) {
                 continue;

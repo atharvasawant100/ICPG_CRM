@@ -35,6 +35,7 @@ class RolePermissionSeeder extends Seeder
     {
         $this->seedPermissions();
         $this->seedRoles();
+        $this->seedDataScopes();
         $this->assignAdminRoles();
         $this->flushCache();
 
@@ -75,6 +76,43 @@ class RolePermissionSeeder extends Seeder
         }
 
         $this->command?->info('Roles: '.implode(', ', Rbac::ROLES));
+    }
+
+    /**
+     * Seed the default data scope for every role and every scoped module.
+     *
+     * Idempotent: existing rows are updated in place, never duplicated, so
+     * re-running the seeder after an admin has customised the matrix does not
+     * silently reset their choices.
+     *
+     * Defaults: admin = all, every other role = own.
+     */
+    protected function seedDataScopes(): void
+    {
+        $scopedModules = array_keys(config('rbac.owner_columns', []));
+
+        if ($scopedModules === []) {
+            return;
+        }
+
+        foreach (Rbac::ROLES as $roleName) {
+            $scope = $roleName === Rbac::ADMIN_ROLE
+                ? \App\Rbac\DataScope::ALL
+                : \App\Rbac\DataScope::OWN;
+
+            foreach ($scopedModules as $module) {
+                \Illuminate\Support\Facades\DB::table('role_module_scopes')->updateOrInsert(
+                    ['role_name' => $roleName, 'module' => $module],
+                    ['scope' => $scope, 'updated_at' => now(), 'created_at' => now()],
+                );
+            }
+        }
+
+        $this->command?->info(sprintf(
+            'Data scopes: %d role(s) x %d scoped module(s).',
+            count(Rbac::ROLES),
+            count($scopedModules)
+        ));
     }
 
     /**

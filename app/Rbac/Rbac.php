@@ -51,6 +51,8 @@ final class Rbac
      */
     public const MODULE_ACTIONS = [
         'dashboard'          => ['view'],
+        // roles.edit guards saving the permission matrix for a role.
+        'roles'              => ['view', 'edit'],
         'customers'          => ['view', 'create', 'edit', 'delete', 'export'],
         // import: bulk CSV/XLSX upload. convert: lead -> customer + invoice.
         // notes.*: notes are their own records with their own lifecycle.
@@ -66,7 +68,6 @@ final class Rbac
         'recurring_invoices' => ['view', 'create', 'edit', 'delete', 'export', 'toggle'],
         'followups'          => ['view', 'create', 'edit', 'delete'],
         'users'              => ['view', 'create', 'edit', 'delete'],
-        'roles'              => ['view'],
         'settings'           => ['view'],
         'audit_logs'         => ['view'],
     ];
