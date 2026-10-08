@@ -35,8 +35,13 @@ return new class extends Migration {
             }
         });
 
-        // Restrict role to admin only
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin') NOT NULL DEFAULT 'admin'");
+        // Restrict role to admin only.
+        // Guarded by driver: MySQL/MariaDB needs the raw statement to narrow the
+        // ENUM, but SQLite has no ENUM type and rejects "MODIFY COLUMN".
+        // On SQLite the original VARCHAR column is left as-is, which is fine.
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin') NOT NULL DEFAULT 'admin'");
+        }
     }
 
     /**
@@ -44,7 +49,9 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'employee') NOT NULL DEFAULT 'employee'");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'employee') NOT NULL DEFAULT 'employee'");
+        }
 
         Schema::table('users', function (Blueprint $table) {
             $table->timestamp('suspended_at')->nullable()->after('role');
