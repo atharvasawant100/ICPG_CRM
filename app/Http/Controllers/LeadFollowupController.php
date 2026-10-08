@@ -17,6 +17,7 @@ class LeadFollowupController extends Controller
      */
     public function store(StoreLeadFollowupRequest $request, Lead $lead)
     {
+        $this->authorize('create', LeadFollowup::class);
         $user = Auth::user();
 
         $followup = LeadFollowup::create([
@@ -46,6 +47,7 @@ class LeadFollowupController extends Controller
      */
     public function update(UpdateLeadFollowupRequest $request, Lead $lead, LeadFollowup $followup)
     {
+        $this->authorize('update', $followup);
         $user = Auth::user();
 
         if ($followup->lead_id !== $lead->id) {
@@ -77,6 +79,7 @@ class LeadFollowupController extends Controller
      */
     public function complete(Request $request, Lead $lead, LeadFollowup $followup)
     {
+        $this->authorize('update', $followup);
         $user = Auth::user();
 
         if ($followup->lead_id !== $lead->id) {
@@ -106,6 +109,7 @@ class LeadFollowupController extends Controller
      */
     public function destroy(Lead $lead, LeadFollowup $followup)
     {
+        $this->authorize('delete', $followup);
         $user = Auth::user();
 
         if ($followup->lead_id !== $lead->id) {
@@ -132,7 +136,9 @@ class LeadFollowupController extends Controller
      */
     public function calendar(Request $request)
     {
+        $this->authorize('viewAny', LeadFollowup::class);
         $query = LeadFollowup::with(['lead', 'user']);
+        $query->applyDataScope($request->user(), 'followups');
 
         if ($request->ajax() || ($request->has('start') && $request->has('end'))) {
             $start = $request->start;

@@ -18,10 +18,29 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        // CHANGED: dashboard is now permission-gated (dashboard.view). Admin
+        // is unaffected via Gate::before.
+        $this->authorize('viewAny', \App\Policies\DashboardPolicy::class);
+
+        $user = $request->user();
+
         $customerQuery = Customer::query();
         $leadQuery = Lead::query();
         $expenseQuery = Expense::query();
         $invoiceQuery = Invoice::query();
+
+        /*
+         | Apply the data scope to every KPI query.
+         |
+         | For the admin the scope is "all", so applyDataScope() returns the
+         | query untouched and every number below is identical to before this
+         | change. Other roles only ever see figures for records they are
+         | allowed to see.
+         */
+        $customerQuery->applyDataScope($user, 'customers');
+        $leadQuery->applyDataScope($user, 'leads');
+        $expenseQuery->applyDataScope($user, 'expenses');
+        $invoiceQuery->applyDataScope($user, 'invoices');
 
         $totalCustomers = (clone $customerQuery)->count();
         $totalLeads = (clone $leadQuery)->count();
@@ -54,7 +73,7 @@ class DashboardController extends Controller
             ->pluck('count', 'source');
 
         $monthlyLeadTrends = (clone $leadQuery)
-            ->select(DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'), DB::raw('count(*) as count'))
+            ->select(DB::raw(\App\Support\MonthExpression::for('created_at').' as month'), DB::raw('count(*) as count'))
             ->where('created_at', '>=', now()->subMonths(12)->startOfMonth())
             ->groupBy('month')
             ->orderBy('month')
@@ -73,6 +92,7 @@ class DashboardController extends Controller
 
         $expensesByCategory = Expense::query()
             ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
+            ->applyDataScope($user, 'expenses')
             ->select('expense_categories.name as category', DB::raw('SUM(expenses.amount) as total'))
             ->where('expenses.status', 'approved')
             ->groupBy('expense_categories.id', 'expense_categories.name')
@@ -81,7 +101,7 @@ class DashboardController extends Controller
             ->pluck('total', 'category');
 
         $monthlyExpenseTrends = (clone $expenseQuery)
-            ->select(DB::raw('DATE_FORMAT(expense_date, "%Y-%m") as month'), DB::raw('SUM(amount) as total'))
+            ->select(DB::raw(\App\Support\MonthExpression::for('expense_date').' as month'), DB::raw('SUM(amount) as total'))
             ->where('expense_date', '>=', now()->subMonths(6)->startOfMonth())
             ->where('status', 'approved')
             ->groupBy('month')
@@ -89,9 +109,34 @@ class DashboardController extends Controller
             ->get();
 
         $totalInvoiceAmount = (clone $invoiceQuery)->whereNotIn('status', ['cancelled'])->sum('total_amount');
+        /*
+         | The remaining aggregates below are raw query-builder joins, which
+         | cannot use the Eloquent scope helper. Compute the visible owner ids
+         | once and filter on them. For the admin this is null, meaning "no
+         | restriction", so the totals are byte-identical to before.
+         */
+        $invoiceOwnerIds = null;
+        $customerOwnerIds = null;
+
+        if (\App\Rbac\DataScope::scopeFor($user, 'invoices') !== \App\Rbac\DataScope::ALL) {
+            $invoiceOwnerIds = \App\Rbac\DataScope::scopeFor($user, 'invoices') === \App\Rbac\DataScope::TEAM
+                ? \App\Rbac\DataScope::teamIds($user)
+                : [$user->id];
+        }
+
+        if (\App\Rbac\DataScope::scopeFor($user, 'customers') !== \App\Rbac\DataScope::ALL) {
+            $customerOwnerIds = \App\Rbac\DataScope::scopeFor($user, 'customers') === \App\Rbac\DataScope::TEAM
+                ? \App\Rbac\DataScope::teamIds($user)
+                : [$user->id];
+        }
+
         $paidInvoices = (float) DB::table('invoice_payments')
             ->join('invoices', 'invoices.id', '=', 'invoice_payments.invoice_id')
             ->whereNotIn('invoices.status', ['cancelled'])
+            ->when(
+                $invoiceOwnerIds !== null,
+                fn ($q) => $q->whereIn('invoices.created_by', $invoiceOwnerIds)
+            )
             ->sum('invoice_payments.amount');
 
         $paidByInvoiceSub = DB::table('invoice_payments')
@@ -105,7 +150,14 @@ class DashboardController extends Controller
             })
             ->whereDate('invoices.due_date', '<', now()->toDateString())
             ->whereNotIn('invoices.status', ['paid', 'cancelled'])
-            ->selectRaw('COALESCE(SUM(GREATEST(invoices.total_amount - COALESCE(p.paid_amount, 0), 0)), 0) as overdue_due_total')
+            ->when(
+                $invoiceOwnerIds !== null,
+                fn ($q) => $q->whereIn('invoices.created_by', $invoiceOwnerIds)
+            )
+            ->selectRaw('COALESCE(SUM('.\App\Support\MonthExpression::greatest(
+                'invoices.total_amount - COALESCE(p.paid_amount, 0)',
+                '0'
+            ).'), 0) as overdue_due_total')
             ->value('overdue_due_total');
 
         $pendingInvoices = (clone $invoiceQuery)->whereIn('status', ['sent', 'partial'])->sum('total_amount');
@@ -125,7 +177,7 @@ class DashboardController extends Controller
         ];
 
         $monthlyInvoiceTrends = (clone $invoiceQuery)
-            ->select(DB::raw('DATE_FORMAT(invoice_date, "%Y-%m") as month'), DB::raw('SUM(total_amount) as total'))
+            ->select(DB::raw(\App\Support\MonthExpression::for('invoice_date').' as month'), DB::raw('SUM(total_amount) as total'))
             ->where('invoice_date', '>=', now()->subMonths(6)->startOfMonth())
             ->whereNotIn('status', ['cancelled'])
             ->groupBy('month')
@@ -136,6 +188,14 @@ class DashboardController extends Controller
             ->join('invoices', 'invoices.id', '=', 'invoice_payments.invoice_id')
             ->join('customers', 'customers.id', '=', 'invoices.customer_id')
             ->whereNotIn('invoices.status', ['cancelled'])
+            ->when(
+                $invoiceOwnerIds !== null,
+                fn ($q) => $q->whereIn('invoices.created_by', $invoiceOwnerIds)
+            )
+            ->when(
+                $customerOwnerIds !== null,
+                fn ($q) => $q->whereIn('customers.created_by', $customerOwnerIds)
+            )
             ->select(
                 'customers.id',
                 'customers.name',
@@ -154,20 +214,22 @@ class DashboardController extends Controller
         $prevMonthStart = now()->subMonthNoOverflow()->startOfMonth()->toDateString();
         $prevMonthEnd = now()->subMonthNoOverflow()->endOfMonth()->toDateString();
 
-        $currentMonthLeads = Lead::whereBetween('created_at', [$currentMonthStart . ' 00:00:00', $currentMonthEnd . ' 23:59:59'])->count();
-        $prevMonthLeads = Lead::whereBetween('created_at', [$prevMonthStart . ' 00:00:00', $prevMonthEnd . ' 23:59:59'])->count();
+        $currentMonthLeads = Lead::applyDataScope($user, 'leads')
+            ->whereBetween('created_at', [$currentMonthStart . ' 00:00:00', $currentMonthEnd . ' 23:59:59'])->count();
+        $prevMonthLeads = Lead::applyDataScope($user, 'leads')
+            ->whereBetween('created_at', [$prevMonthStart . ' 00:00:00', $prevMonthEnd . ' 23:59:59'])->count();
 
-        $currentMonthConverted = Lead::where('status', 'converted')
+        $currentMonthConverted = Lead::applyDataScope($user, 'leads')->where('status', 'converted')
             ->whereBetween('updated_at', [$currentMonthStart . ' 00:00:00', $currentMonthEnd . ' 23:59:59'])
             ->count();
-        $prevMonthConverted = Lead::where('status', 'converted')
+        $prevMonthConverted = Lead::applyDataScope($user, 'leads')->where('status', 'converted')
             ->whereBetween('updated_at', [$prevMonthStart . ' 00:00:00', $prevMonthEnd . ' 23:59:59'])
             ->count();
 
-        $currentMonthInvoices = Invoice::whereNotIn('status', ['cancelled'])
+        $currentMonthInvoices = Invoice::applyDataScope($user, 'invoices')->whereNotIn('status', ['cancelled'])
             ->whereBetween('invoice_date', [$currentMonthStart, $currentMonthEnd])
             ->count();
-        $prevMonthInvoices = Invoice::whereNotIn('status', ['cancelled'])
+        $prevMonthInvoices = Invoice::applyDataScope($user, 'invoices')->whereNotIn('status', ['cancelled'])
             ->whereBetween('invoice_date', [$prevMonthStart, $prevMonthEnd])
             ->count();
 
@@ -178,10 +240,10 @@ class DashboardController extends Controller
             ->whereBetween('payment_date', [$prevMonthStart, $prevMonthEnd])
             ->sum('amount');
 
-        $currentMonthExpenses = (float) Expense::where('status', 'approved')
+        $currentMonthExpenses = (float) Expense::applyDataScope($user, 'expenses')->where('status', 'approved')
             ->whereBetween('expense_date', [$currentMonthStart, $currentMonthEnd])
             ->sum('amount');
-        $prevMonthExpenses = (float) Expense::where('status', 'approved')
+        $prevMonthExpenses = (float) Expense::applyDataScope($user, 'expenses')->where('status', 'approved')
             ->whereBetween('expense_date', [$prevMonthStart, $prevMonthEnd])
             ->sum('amount');
 
@@ -206,12 +268,13 @@ class DashboardController extends Controller
         // Monthly P&L (last 6 months)
         $months = collect(range(5, 0))->map(fn ($i) => now()->subMonths($i)->format('Y-m'));
         $revenueByMonth = DB::table('invoice_payments')
-            ->select(DB::raw('DATE_FORMAT(payment_date, "%Y-%m") as month'), DB::raw('SUM(amount) as total'))
+            ->select(DB::raw(\App\Support\MonthExpression::for('payment_date').' as month'), DB::raw('SUM(amount) as total'))
             ->where('payment_date', '>=', now()->subMonths(5)->startOfMonth()->toDateString())
             ->groupBy('month')
             ->pluck('total', 'month');
         $expenseByMonth = Expense::query()
-            ->select(DB::raw('DATE_FORMAT(expense_date, "%Y-%m") as month'), DB::raw('SUM(amount) as total'))
+            ->applyDataScope($user, 'expenses')
+            ->select(DB::raw(\App\Support\MonthExpression::for('expense_date').' as month'), DB::raw('SUM(amount) as total'))
             ->where('status', 'approved')
             ->where('expense_date', '>=', now()->subMonths(5)->startOfMonth()->toDateString())
             ->groupBy('month')
@@ -235,6 +298,7 @@ class DashboardController extends Controller
             'lead:id,name,email,company',
             'user:id,name'
         ])
+            ->whereHas('lead', fn ($q) => $q->applyDataScope($user, 'leads'))
             ->latest()
             ->take(8)
             ->get();
@@ -243,6 +307,7 @@ class DashboardController extends Controller
             ->where('status', 'pending')
             ->where('followup_date', '>=', now())
             ->with(['lead:id,name,email,company', 'user:id,name'])
+            ->whereHas('lead', fn ($q) => $q->applyDataScope($user, 'leads'))
             ->orderBy('followup_date')
             ->take(10)
             ->get();
@@ -252,6 +317,7 @@ class DashboardController extends Controller
             ->where('followup_type', 'meeting')
             ->where('followup_date', '>=', now())
             ->with(['lead:id,name,email,company,phone', 'user:id,name'])
+            ->whereHas('lead', fn ($q) => $q->applyDataScope($user, 'leads'))
             ->orderBy('followup_date')
             ->take(10)
             ->get();

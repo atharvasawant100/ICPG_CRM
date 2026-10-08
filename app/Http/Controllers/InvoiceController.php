@@ -25,9 +25,14 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Invoice::class);
+
         $user = Auth::user();
 
         $query = Invoice::with(['customer', 'creator'])->withCount('payments');
+
+        // Data scope. No-op for the admin.
+        $query->applyDataScope($user, 'invoices');
 
         // Apply filters
         if ($request->filled('status')) {
@@ -73,6 +78,9 @@ class InvoiceController extends Controller
      */
     public function create()
     {
+
+        $this->authorize('create', Invoice::class);
+
         $user = Auth::user();
 
         $customers = Customer::where('status', 'active')->orderBy('name')->get();
@@ -89,6 +97,9 @@ class InvoiceController extends Controller
      */
     public function store(StoreInvoiceRequest $request)
     {
+
+        $this->authorize('create', Invoice::class);
+
         $data = $request->validated();
 
         // Customer check
@@ -223,6 +234,9 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice)
     {
+
+        $this->authorize('view', $invoice);
+
         // Removed department permission check
 
         $invoice->load(['customer', 'creator', 'items.service', 'payments.creator']); // Removed department from load
@@ -235,6 +249,9 @@ class InvoiceController extends Controller
      */
     public function edit(Invoice $invoice)
     {
+
+        $this->authorize('update', $invoice);
+
         // Removed department permission check
 
         // Draft and sent invoices without payments can be edited.
@@ -258,6 +275,9 @@ class InvoiceController extends Controller
      */
     public function update(UpdateInvoiceRequest $request, Invoice $invoice)
     {
+
+        $this->authorize('update', $invoice);
+
         // Removed department permission check
 
         // Keep paid/partial/cancelled accounting records immutable.
@@ -341,6 +361,9 @@ class InvoiceController extends Controller
      */
     public function destroy(Invoice $invoice)
     {
+
+        $this->authorize('delete', $invoice);
+
         // Removed department permission check
 
         // Only draft invoices can be deleted
@@ -364,6 +387,9 @@ class InvoiceController extends Controller
      */
     public function send(Request $request, Invoice $invoice)
     {
+
+        $this->authorize('send', $invoice);
+
         // Removed department permission check
 
         if ($invoice->status === 'paid' || $invoice->status === 'cancelled') {
@@ -415,6 +441,9 @@ class InvoiceController extends Controller
      */
     public function cancel(Invoice $invoice)
     {
+
+        $this->authorize('cancel', $invoice);
+
         // Removed department permission check
 
         if ($invoice->status === 'paid') {
@@ -432,6 +461,9 @@ class InvoiceController extends Controller
      */
     public function pdf(Invoice $invoice)
     {
+
+        $this->authorize('pdf', $invoice);
+
         // Removed department permission check
 
         // Ensure storage/fonts directory exists

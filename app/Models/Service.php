@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Rbac\Concerns\Auditable;
+use App\Rbac\HasDataScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Service extends Model
 {
-    use HasFactory;
+    /** @use HasFactory<\Database\Factories\ServiceFactory> */
+    use Auditable, HasFactory, HasDataScope;
+
+    /** Audit module label. */
+    protected $auditModule = 'services';
 
     protected $fillable = [
         'name',

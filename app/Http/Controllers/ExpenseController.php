@@ -17,7 +17,12 @@ class ExpenseController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Expense::class);
+
         $query = Expense::with(['category', 'user']);
+
+        // Data scope. No-op for the admin.
+        $query->applyDataScope($request->user(), 'expenses');
 
         // Apply filters
         if ($request->filled('status')) {
@@ -57,7 +62,12 @@ class ExpenseController extends Controller
      */
     public function pending(Request $request)
     {
+        $this->authorize('approveAny', Expense::class);
+
         $query = Expense::where('status', 'pending')->with(['category', 'user']);
+
+        // An approver still only sees what their scope allows.
+        $query->applyDataScope($request->user(), 'expenses');
 
         // Apply filters
         if ($request->filled('category_id')) {
@@ -96,6 +106,8 @@ class ExpenseController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Expense::class);
+
         $categories = ExpenseCategory::orderBy('name')->get();
         return view('expenses.create', compact('categories'));
     }
@@ -105,6 +117,8 @@ class ExpenseController extends Controller
      */
     public function store(StoreExpenseRequest $request)
     {
+        $this->authorize('create', Expense::class);
+
         $data = $request->validated();
 
         // Handle receipt upload
@@ -126,6 +140,8 @@ class ExpenseController extends Controller
      */
     public function show(Expense $expense)
     {
+        $this->authorize('view', $expense);
+
         $expense->load(['category', 'user', 'approver']);
 
         return view('expenses.show', compact('expense'));
@@ -136,6 +152,8 @@ class ExpenseController extends Controller
      */
     public function edit(Expense $expense)
     {
+        $this->authorize('update', $expense);
+
         if (!$expense->isPending()) {
             return redirect()->route('expenses.show', $expense)
                 ->with('error', 'Only pending expenses can be edited.');
@@ -150,6 +168,8 @@ class ExpenseController extends Controller
      */
     public function update(UpdateExpenseRequest $request, Expense $expense)
     {
+        $this->authorize('update', $expense);
+
         if (!$expense->isPending()) {
             return redirect()->route('expenses.show', $expense)
                 ->with('error', 'Only pending expenses can be edited.');
@@ -177,6 +197,8 @@ class ExpenseController extends Controller
      */
     public function destroy(Expense $expense)
     {
+        $this->authorize('delete', $expense);
+
         if (!$expense->isPending()) {
             return redirect()->route('expenses.index')
                 ->with('error', 'Only pending expenses can be deleted.');
@@ -198,11 +220,12 @@ class ExpenseController extends Controller
      */
     public function reports(Request $request)
     {
-        $user = Auth::user();
+        // CHANGED from: if (!$user->isAdmin()) abort(403)
+        // Now expressed as a permission, so any role granted expenses.export
+        // can reach it. Admin is unaffected via Gate::before.
+        $this->authorize('export', Expense::class);
 
-        if (!$user->isAdmin()) {
-            abort(403, 'Unauthorized action.');
-        }
+        $user = $request->user();
 
         // Get date range filters
         $dateFrom = $request->get('date_from', now()->startOfMonth()->toDateString());
@@ -210,6 +233,7 @@ class ExpenseController extends Controller
 
         // Expenses by category
         $expensesByCategory = Expense::whereBetween('expense_date', [$dateFrom, $dateTo])
+            ->applyDataScope($user, 'expenses')
             ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
             ->with('category')
@@ -217,13 +241,15 @@ class ExpenseController extends Controller
 
         // Expenses by status
         $expensesByStatus = Expense::whereBetween('expense_date', [$dateFrom, $dateTo])
+            ->applyDataScope($user, 'expenses')
             ->selectRaw('status, SUM(amount) as total, COUNT(*) as count')
             ->groupBy('status')
             ->get();
 
         // Monthly trends
         $monthlyTrends = Expense::whereBetween('expense_date', [$dateFrom, $dateTo])
-            ->selectRaw('DATE_FORMAT(expense_date, "%Y-%m") as month, SUM(amount) as total')
+            ->applyDataScope($user, 'expenses')
+            ->selectRaw(\App\Support\MonthExpression::for('expense_date').' as month, SUM(amount) as total')
             ->groupBy('month')
             ->orderBy('month')
             ->get();

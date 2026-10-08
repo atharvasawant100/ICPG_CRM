@@ -35,7 +35,11 @@ class LeadController extends BaseApiController
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Lead::class);
         $query = Lead::with('creator');
+
+        // Data scope. No-op for the admin.
+        $query->applyDataScope($request->user(), 'leads');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -67,6 +71,7 @@ class LeadController extends BaseApiController
      */
     public function store(StoreLeadRequest $request)
     {
+        $this->authorize('create', Lead::class);
         $data = $request->validated();
 
         $lead = Lead::create([
@@ -84,6 +89,7 @@ class LeadController extends BaseApiController
      */
     public function show(Lead $lead)
     {
+        $this->authorize('view', $lead);
         $lead->load([
             'creator',
             'activities.user',
@@ -100,6 +106,7 @@ class LeadController extends BaseApiController
      */
     public function update(UpdateLeadRequest $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
         $data = $request->validated();
 
         $changes = [];
@@ -133,6 +140,7 @@ class LeadController extends BaseApiController
      */
     public function destroy(Lead $lead)
     {
+        $this->authorize('delete', $lead);
         $leadName = $lead->name;
         $lead->delete();
 
@@ -153,7 +161,11 @@ class LeadController extends BaseApiController
      */
     public function trash(Request $request)
     {
+        $this->authorize('viewAny', Lead::class);
         $query = Lead::onlyTrashed()->with('creator');
+
+        // Data scope also applies to the trash listing.
+        $query->applyDataScope($request->user(), 'leads');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -181,6 +193,7 @@ class LeadController extends BaseApiController
      */
     public function restore($id)
     {
+        $this->authorize('update', $lead);
         $lead = Lead::onlyTrashed()->find($id);
         if (!$lead) {
             return $this->sendError('Lead not found in trash.');
@@ -205,15 +218,10 @@ class LeadController extends BaseApiController
      */
     public function forceDelete($id)
     {
+        $this->authorize('delete', $lead);
         $lead = Lead::onlyTrashed()->find($id);
         if (!$lead) {
             return $this->sendError('Lead not found in trash.');
-        }
-
-        $user = Auth::user();
-
-        if (!$user->isAdmin()) {
-            return $this->sendError('Unauthorized action. Only admin can permanently delete leads.', [], 403);
         }
 
         $leadName = $lead->name;
@@ -227,6 +235,7 @@ class LeadController extends BaseApiController
      */
     public function convertToCustomer(Request $request, $id)
     {
+        $this->authorize('convert', $lead);
         $lead = Lead::find($id);
         if (!$lead) {
             return $this->sendError('Lead not found.');
@@ -276,7 +285,13 @@ class LeadController extends BaseApiController
      */
     public function dashboard(Request $request)
     {
+        $this->authorize('viewAny', Lead::class);
+        $user = $request->user();
+
         $baseQuery = Lead::query();
+
+        // KPI scope. No-op for the admin.
+        $baseQuery->applyDataScope($user, 'leads');
 
         $totalLeads = (clone $baseQuery)->count();
         $newLeads = (clone $baseQuery)->where('status', 'new')->count();
@@ -298,6 +313,7 @@ class LeadController extends BaseApiController
             ->count();
 
         $followupQuery = LeadFollowup::where('status', 'pending');
+        $followupQuery->applyDataScope($user, 'followups');
         $pendingFollowups = $followupQuery->count();
         $overdueFollowups = (clone $followupQuery)->where('followup_date', '<', now())->count();
 

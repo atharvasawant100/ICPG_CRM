@@ -14,8 +14,24 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            // Blocks deactivated users on every authenticated route.
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        /*
+         | AJAX / JSON clients must receive a JSON 403 rather than the HTML
+         | error page. Registered before the render callback so it wins.
+         */
+        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => $e->getMessage() ?: 'This action is unauthorized.',
+                ], 403);
+            }
+
+            return null;
+        });
     })->create();

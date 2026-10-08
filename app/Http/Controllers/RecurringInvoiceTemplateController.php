@@ -19,7 +19,11 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function index(Request $request)
     {
+
+        $this->authorize('viewAny', RecurringInvoiceTemplate::class);
+
         $templates = RecurringInvoiceTemplate::with(['customer', 'creator'])
+            ->applyDataScope($request->user(), 'recurring_invoices')
             ->latest()
             ->paginate(15);
 
@@ -31,6 +35,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function create()
     {
+
+        $this->authorize('create', RecurringInvoiceTemplate::class);
+
         $customers = Customer::where('status', 'active')->orderBy('name')->get();
 
         return view('recurring-invoices.create', compact('customers'));
@@ -41,6 +48,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function store(StoreRecurringInvoiceTemplateRequest $request)
     {
+
+        $this->authorize('create', RecurringInvoiceTemplate::class);
+
         $data = $request->validated();
 
         // Calculate totals if not provided
@@ -115,6 +125,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function show(RecurringInvoiceTemplate $template)
     {
+
+        $this->authorize('view', $template);
+
         $template->load(['customer', 'creator', 'items', 'invoices']);
         
         return view('recurring-invoices.show', compact('template'));
@@ -125,6 +138,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function edit(RecurringInvoiceTemplate $template)
     {
+
+        $this->authorize('update', $template);
+
         $customers = Customer::where('status', 'active')->orderBy('name')->get();
         $template->load(['items']);
 
@@ -136,6 +152,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function update(UpdateRecurringInvoiceTemplateRequest $request, RecurringInvoiceTemplate $template)
     {
+
+        $this->authorize('update', $template);
+
         $data = $request->validated();
 
         // Calculate totals if not provided
@@ -208,6 +227,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function destroy(RecurringInvoiceTemplate $template)
     {
+
+        $this->authorize('delete', $template);
+
         try {
             $template->delete();
             return redirect()->route('recurring-invoices.index')
@@ -223,6 +245,9 @@ class RecurringInvoiceTemplateController extends Controller
      */
     public function toggle(RecurringInvoiceTemplate $template)
     {
+
+        $this->authorize('toggle', $template);
+
         $template->is_active = !$template->is_active;
         $template->save();
 

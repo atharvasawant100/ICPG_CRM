@@ -2,12 +2,22 @@
 
 namespace App\Models;
 
+use App\Rbac\Concerns\Auditable;
+use App\Rbac\HasDataScope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Expense extends Model
 {
-    protected $fillable = [
+    /** @use HasFactory<\Database\Factories\ExpenseFactory> */
+    use Auditable, HasFactory, HasDataScope;
+
+    /** Audit module label. */
+    /** Audit module label. */
+    protected $auditModule = 'expenses';
+
+        protected $fillable = [
         'user_id',
         'category_id',
         'amount',

@@ -10,11 +10,27 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Throwable;
+use App\Rbac\Concerns\Auditable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, HasRoles, \App\Rbac\AssignsRoles;
+    use Auditable, HasFactory, Notifiable, HasApiTokens, HasRoles, \App\Rbac\AssignsRoles;
+
+    /**
+     * Audit module label for this model.
+     */
+    protected $auditModule = 'users';
+
+    /**
+     * Never write these to the audit trail, in any case.
+     *
+     * @var list<string>
+     */
+    protected $auditExclude = [
+        'password',
+        'remember_token',
+    ];
 
     /**
      * The attributes that are mass assignable.

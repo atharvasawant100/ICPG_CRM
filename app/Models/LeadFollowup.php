@@ -2,12 +2,22 @@
 
 namespace App\Models;
 
+use App\Rbac\Concerns\Auditable;
+use App\Rbac\HasDataScope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeadFollowup extends Model
 {
-    protected $fillable = [
+    /** @use HasFactory<\Database\Factories\LeadFollowupFactory> */
+    use Auditable, HasFactory, HasDataScope;
+
+    /** Audit module label. */
+    /** Audit module label. */
+    protected $auditModule = 'followups';
+
+        protected $fillable = [
         'lead_id',
         'user_id',
         'followup_date',

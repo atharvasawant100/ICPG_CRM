@@ -17,7 +17,11 @@ class CustomerController extends BaseApiController
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Customer::class);
         $query = Customer::with(['creator']);
+
+        // Data scope. No-op for the admin.
+        $query->applyDataScope($request->user(), 'customers');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -41,6 +45,7 @@ class CustomerController extends BaseApiController
      */
     public function store(StoreCustomerRequest $request)
     {
+        $this->authorize('create', Customer::class);
         $data = $request->validated();
 
         $customer = Customer::create([
@@ -56,6 +61,7 @@ class CustomerController extends BaseApiController
      */
     public function show(Customer $customer)
     {
+        $this->authorize('view', $customer);
         $customer->load(['creator']);
 
         return $this->sendResponse(new CustomerResource($customer), 'Customer retrieved successfully.');
@@ -66,6 +72,7 @@ class CustomerController extends BaseApiController
      */
     public function update(UpdateCustomerRequest $request, Customer $customer)
     {
+        $this->authorize('update', $customer);
         $data = $request->validated();
 
         $customer->update($data);
@@ -78,6 +85,7 @@ class CustomerController extends BaseApiController
      */
     public function destroy(Customer $customer)
     {
+        $this->authorize('delete', $customer);
         try {
             $customer->delete();
         } catch (\Exception $e) {

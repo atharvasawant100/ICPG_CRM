@@ -15,7 +15,13 @@ class ServiceController extends Controller
      */
     public function index(Request $request)
     {
+
+        $this->authorize('viewAny', Service::class);
+
         $query = Service::with(['creator']);
+
+        // Data scope. No-op for the admin.
+        $query->applyDataScope($request->user(), 'services');
 
         // Apply filters
         if ($request->filled('frequency')) {
@@ -44,6 +50,9 @@ class ServiceController extends Controller
      */
     public function create()
     {
+
+        $this->authorize('create', Service::class);
+
         return view('services.create');
     }
 
@@ -52,6 +61,9 @@ class ServiceController extends Controller
      */
     public function store(StoreServiceRequest $request)
     {
+
+        $this->authorize('create', Service::class);
+
         $user = Auth::user();
         $data = $request->validated();
         $data['created_by'] = $user->id;
@@ -73,6 +85,9 @@ class ServiceController extends Controller
      */
     public function show(Service $service)
     {
+
+        $this->authorize('view', $service);
+
         $service->load(['creator', 'invoiceItems.invoice']);
 
         return view('services.show', compact('service'));
@@ -83,6 +98,9 @@ class ServiceController extends Controller
      */
     public function edit(Service $service)
     {
+
+        $this->authorize('update', $service);
+
         return view('services.edit', compact('service'));
     }
 
@@ -91,6 +109,9 @@ class ServiceController extends Controller
      */
     public function update(UpdateServiceRequest $request, Service $service)
     {
+
+        $this->authorize('update', $service);
+
         $data = $request->validated();
         $data['is_active'] = $request->has('is_active') ? $request->boolean('is_active') : $service->is_active;
 
@@ -110,6 +131,9 @@ class ServiceController extends Controller
      */
     public function destroy(Service $service)
     {
+
+        $this->authorize('delete', $service);
+
         // Check if service is used in any invoice items
         if ($service->invoiceItems()->count() > 0) {
             return redirect()->route('services.index')

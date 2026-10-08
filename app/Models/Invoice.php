@@ -2,13 +2,21 @@
 
 namespace App\Models;
 
+use App\Rbac\Concerns\Auditable;
+use App\Rbac\HasDataScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
-    protected $fillable = [
+    use Auditable, HasDataScope;
+
+    /** Audit module label. */
+    /** Audit module label. */
+    protected $auditModule = 'invoices';
+
+        protected $fillable = [
         'invoice_number',
         'customer_id',
         // 'department_id', // Removed

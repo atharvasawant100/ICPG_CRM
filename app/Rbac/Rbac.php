@@ -52,11 +52,18 @@ final class Rbac
     public const MODULE_ACTIONS = [
         'dashboard'          => ['view'],
         'customers'          => ['view', 'create', 'edit', 'delete', 'export'],
-        'leads'              => ['view', 'create', 'edit', 'delete', 'export', 'reassign'],
+        // import: bulk CSV/XLSX upload. convert: lead -> customer + invoice.
+        // notes.*: notes are their own records with their own lifecycle.
+        'leads'              => ['view', 'create', 'edit', 'delete', 'export', 'reassign', 'import', 'convert', 'notes.create', 'notes.delete'],
         'expenses'           => ['view', 'create', 'edit', 'delete', 'export', 'approve'],
+        // Categories are a real module: own table, own controller, own page.
+        'expense_categories' => ['view', 'create', 'edit', 'delete'],
         'services'           => ['view', 'create', 'edit', 'delete', 'export'],
-        'invoices'           => ['view', 'create', 'edit', 'delete', 'export'],
-        'recurring_invoices' => ['view', 'create', 'edit', 'delete', 'export'],
+        // send/cancel are irreversible external side effects. payments.* are
+        // financial writes. All kept distinct from invoices.edit on purpose.
+        // The single-invoice PDF download rides on invoices.export.
+        'invoices'           => ['view', 'create', 'edit', 'delete', 'export', 'send', 'cancel', 'payments.create', 'payments.delete'],
+        'recurring_invoices' => ['view', 'create', 'edit', 'delete', 'export', 'toggle'],
         'followups'          => ['view', 'create', 'edit', 'delete'],
         'users'              => ['view', 'create', 'edit', 'delete'],
         'roles'              => ['view'],

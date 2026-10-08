@@ -15,6 +15,7 @@ class LeadNoteController extends Controller
      */
     public function store(Request $request, Lead $lead)
     {
+        $this->authorize('addNote', $lead);
         $user = Auth::user();
 
         $request->validate([
@@ -56,6 +57,7 @@ class LeadNoteController extends Controller
      */
     public function destroy(Lead $lead, LeadNote $note)
     {
+        $this->authorize('deleteNote', $lead);
         $user = Auth::user();
 
         // Verify note belongs to lead

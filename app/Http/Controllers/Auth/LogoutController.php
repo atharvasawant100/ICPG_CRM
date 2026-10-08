@@ -13,6 +13,10 @@ class LogoutController extends Controller
      */
     public function logout(Request $request)
     {
+        // Audit the logout before the session is destroyed. Failure to audit
+        // must not prevent the logout itself.
+        \App\Rbac\AuditLogger::recordAuth('logout', Auth::id());
+
         // #region agent log
         $logPath = base_path('.cursor/debug.log');
         @file_put_contents($logPath, json_encode(['id'=>'log_'.time().'_entry','timestamp'=>time()*1000,'location'=>'LogoutController.php:14','message'=>'Logout method called','data'=>['method'=>$request->method(),'hasAuth'=>Auth::check(),'userId'=>Auth::check()?Auth::id():null],'sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C'])."\n", FILE_APPEND | LOCK_EX);

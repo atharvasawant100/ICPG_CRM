@@ -15,6 +15,7 @@ class InvoicePaymentController extends Controller
      */
     public function store(StoreInvoicePaymentRequest $request, Invoice $invoice)
     {
+        $this->authorize('recordPayment', $invoice);
         if ($invoice->status === 'cancelled') {
             return back()->with('error', 'Cannot add payment to a cancelled invoice.');
         }
@@ -63,6 +64,7 @@ class InvoicePaymentController extends Controller
      */
     public function destroy(InvoicePayment $payment)
     {
+        $this->authorize('deletePayment', $payment);
         $invoice = $payment->invoice;
 
         try {

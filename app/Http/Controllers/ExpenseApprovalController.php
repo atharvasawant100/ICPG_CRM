@@ -13,12 +13,11 @@ class ExpenseApprovalController extends Controller
      */
     public function update(ApproveExpenseRequest $request, Expense $expense)
     {
-        $user = Auth::user();
-        
-        // Only admin can approve/reject
-        if (!$user->isAdmin()) {
-            abort(403, 'Unauthorized action.');
-        }
+        // CHANGED from: if (!$user->isAdmin()) abort(403)
+        // Now expressed as the expenses.approve permission plus the record's
+        // data scope, so a Manager granted approve can use it without being an
+        // admin. Admin behaviour is unchanged via Gate::before.
+        $this->authorize('approve', $expense);
 
         if ($expense->status !== 'pending') {
             return redirect()->route('expenses.show', $expense)

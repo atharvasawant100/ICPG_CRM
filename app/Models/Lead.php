@@ -2,12 +2,20 @@
 
 namespace App\Models;
 
+use App\Rbac\Concerns\Auditable;
+use App\Rbac\HasDataScope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Lead extends Model
 {
+    /** @use HasFactory<\Database\Factories\LeadFactory> */
+    use Auditable, HasFactory, HasDataScope;
+
+    /** Audit module label. */
+    protected $auditModule = 'leads';
     use SoftDeletes;
 
     protected $fillable = [

@@ -18,7 +18,11 @@ class ExpenseController extends BaseApiController
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Expense::class);
         $query = Expense::with(['category', 'user']);
+
+        // Data scope. No-op for the admin.
+        $query->applyDataScope($request->user(), 'expenses');
 
         // Apply filters
         if ($request->filled('status')) {
@@ -60,6 +64,7 @@ class ExpenseController extends BaseApiController
      */
     public function store(StoreExpenseRequest $request)
     {
+        $this->authorize('create', Expense::class);
         $data = $request->validated();
 
         // Handle receipt upload
@@ -80,6 +85,7 @@ class ExpenseController extends BaseApiController
      */
     public function show($id)
     {
+        $this->authorize('view', $expense);
         $expense = Expense::find($id);
 
         if (!$expense) {
@@ -96,6 +102,7 @@ class ExpenseController extends BaseApiController
      */
     public function update(UpdateExpenseRequest $request, $id)
     {
+        $this->authorize('update', $expense);
         $expense = Expense::find($id);
 
         if (!$expense) {
@@ -127,6 +134,7 @@ class ExpenseController extends BaseApiController
      */
     public function destroy($id)
     {
+        $this->authorize('delete', $expense);
         $expense = Expense::find($id);
         if (!$expense) {
             return $this->sendError('Expense not found.');
@@ -151,7 +159,11 @@ class ExpenseController extends BaseApiController
      */
     public function pending(Request $request)
     {
+        $this->authorize('approveAny', Expense::class);
         $query = Expense::where('status', 'pending')->with(['category', 'user']);
+
+        // An approver still only sees what their scope allows.
+        $query->applyDataScope($request->user(), 'expenses');
 
         // Apply filters
         if ($request->filled('category_id')) {
@@ -192,6 +204,7 @@ class ExpenseController extends BaseApiController
      */
     public function approve(Request $request, $id)
     {
+        $this->authorize('approve', $expense);
         $expense = Expense::find($id);
         if (!$expense) {
             return $this->sendError('Expense not found.');

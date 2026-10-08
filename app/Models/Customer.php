@@ -2,11 +2,19 @@
 
 namespace App\Models;
 
+use App\Rbac\Concerns\Auditable;
+use App\Rbac\HasDataScope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Customer extends Model
 {
+    /** @use HasFactory<\Database\Factories\CustomerFactory> */
+    use Auditable, HasFactory, HasDataScope;
+
+    /** Audit module label. */
+    protected $auditModule = 'customers';
     protected $fillable = [
         'name',
         'email',

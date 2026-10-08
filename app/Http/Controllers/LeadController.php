@@ -36,7 +36,12 @@ class LeadController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Lead::class);
+
         $query = Lead::with(['creator']);
+
+        // Data scope. No-op for the admin, whose scope is "all".
+        $query->applyDataScope($request->user(), 'leads');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -65,6 +70,8 @@ class LeadController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Lead::class);
+
         return view('leads.create-options');
     }
 
@@ -73,6 +80,8 @@ class LeadController extends Controller
      */
     public function createManual()
     {
+        $this->authorize('create', Lead::class);
+
         return view('leads.create');
     }
 
@@ -81,6 +90,8 @@ class LeadController extends Controller
      */
     public function createBulk()
     {
+        $this->authorize('import', Lead::class);
+
         return view('leads.bulk-import');
     }
 
@@ -89,6 +100,8 @@ class LeadController extends Controller
      */
     public function store(StoreLeadRequest $request)
     {
+        $this->authorize('create', Lead::class);
+
         $data = $request->validated();
 
         $lead = Lead::create([
@@ -107,6 +120,8 @@ class LeadController extends Controller
      */
     public function bulkImportStore(Request $request)
     {
+        $this->authorize('import', Lead::class);
+
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv,txt|max:5120',
         ]);
@@ -151,6 +166,8 @@ class LeadController extends Controller
      */
     public function downloadTemplate()
     {
+        $this->authorize('import', Lead::class);
+
         return Excel::download(new LeadsExportTemplate(), 'leads_import_template.xlsx');
     }
 
@@ -159,6 +176,8 @@ class LeadController extends Controller
      */
     public function show(Lead $lead)
     {
+        $this->authorize('view', $lead);
+
         $lead->load(['creator', 'activities.user', 'followups.user', 'convertedCustomer', 'notes.user']);
 
         return view('leads.show', compact('lead'));
@@ -169,6 +188,8 @@ class LeadController extends Controller
      */
     public function edit(Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         return view('leads.edit', compact('lead'));
     }
 
@@ -177,6 +198,8 @@ class LeadController extends Controller
      */
     public function update(UpdateLeadRequest $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $data = $request->validated();
 
         $changes = [];
@@ -206,6 +229,8 @@ class LeadController extends Controller
      */
     public function destroy(Lead $lead)
     {
+        $this->authorize('delete', $lead);
+
         $leadName = $lead->name;
         $lead->delete();
 
@@ -225,7 +250,12 @@ class LeadController extends Controller
      */
     public function trash(Request $request)
     {
+        $this->authorize('viewAny', Lead::class);
+
         $query = Lead::onlyTrashed()->with(['creator']);
+
+        // Data scope also applies to the trash listing.
+        $query->applyDataScope($request->user(), 'leads');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -250,6 +280,8 @@ class LeadController extends Controller
             abort(404);
         }
 
+        $this->authorize('update', $lead);
+
         $lead->restore();
 
         LeadActivity::create([
@@ -273,6 +305,8 @@ class LeadController extends Controller
             abort(404);
         }
 
+        $this->authorize('delete', $lead);
+
         $leadName = $lead->name;
         $lead->forceDelete();
 
@@ -285,6 +319,8 @@ class LeadController extends Controller
      */
     public function convertToCustomer(Request $request, Lead $lead)
     {
+        $this->authorize('convert', $lead);
+
         $user = Auth::user();
 
         if ($lead->isConverted()) {
@@ -326,7 +362,14 @@ class LeadController extends Controller
      */
     public function dashboard()
     {
+        $this->authorize('viewAny', Lead::class);
+
+        $user = request()->user();
+
         $baseQuery = Lead::query();
+
+        // KPI scope. No-op for the admin, so the numbers stay identical.
+        $baseQuery->applyDataScope($user, 'leads');
 
         $totalLeads = (clone $baseQuery)->count();
         $newLeads = (clone $baseQuery)->where('status', 'new')->count();
@@ -342,6 +385,9 @@ class LeadController extends Controller
             ->count();
 
         $followupQuery = LeadFollowup::query();
+
+        // Follow-up KPIs follow the same rule.
+        $followupQuery->applyDataScope($user, 'followups');
 
         $pendingFollowups = (clone $followupQuery)
             ->where('status', 'pending')
@@ -369,7 +415,7 @@ class LeadController extends Controller
 
         $monthlyTrends = (clone $baseQuery)
             ->select(
-                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw(\App\Support\MonthExpression::for('created_at').' as month'),
                 DB::raw('count(*) as count')
             )
             ->where('created_at', '>=', now()->subMonths(6))
@@ -401,6 +447,8 @@ class LeadController extends Controller
      */
     public function trackAction(Request $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $request->validate([
             'action' => 'required|string|in:call,whatsapp',
         ]);

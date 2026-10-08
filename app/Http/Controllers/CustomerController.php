@@ -15,7 +15,12 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Customer::class);
+
         $query = Customer::with(['creator']);
+
+        // Data scope. No-op for the admin, whose scope is "all".
+        $query->applyDataScope($request->user(), 'customers');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -36,6 +41,8 @@ class CustomerController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Customer::class);
+
         return view('customers.create');
     }
 
@@ -44,6 +51,8 @@ class CustomerController extends Controller
      */
     public function store(StoreCustomerRequest $request)
     {
+        $this->authorize('create', Customer::class);
+
         $data = $request->validated();
 
         $customer = Customer::create([
@@ -60,6 +69,8 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
+        $this->authorize('view', $customer);
+
         $customer->load(['creator']);
         return view('customers.show', compact('customer'));
     }
@@ -69,6 +80,8 @@ class CustomerController extends Controller
      */
     public function edit(Customer $customer)
     {
+        $this->authorize('update', $customer);
+
         return view('customers.edit', compact('customer'));
     }
 
@@ -77,6 +90,8 @@ class CustomerController extends Controller
      */
     public function update(UpdateCustomerRequest $request, Customer $customer)
     {
+        $this->authorize('update', $customer);
+
         $data = $request->validated();
 
         $customer->update($data);
@@ -90,6 +105,8 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
+        $this->authorize('delete', $customer);
+
         try {
             $customer->delete();
         } catch (\Exception $e) {

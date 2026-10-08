@@ -13,7 +13,9 @@ class ExpenseCategoryController extends Controller
      */
     public function index()
     {
+        $this->authorize('viewAny', ExpenseCategory::class);
         $categories = ExpenseCategory::with('creator')
+            ->applyDataScope(auth()->user(), 'expense_categories')
             ->orderBy('is_custom')
             ->orderBy('name')
             ->paginate(20);
@@ -26,6 +28,7 @@ class ExpenseCategoryController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', ExpenseCategory::class);
         $request->validate([
             'name' => 'required|string|max:255|unique:expense_categories,name',
             'description' => 'nullable|string|max:500',
@@ -47,6 +50,7 @@ class ExpenseCategoryController extends Controller
      */
     public function update(Request $request, ExpenseCategory $expenseCategory)
     {
+        $this->authorize('update', $expenseCategory);
         $request->validate([
             'name' => 'required|string|max:255|unique:expense_categories,name,' . $expenseCategory->id,
             'description' => 'nullable|string|max:500',
@@ -72,6 +76,7 @@ class ExpenseCategoryController extends Controller
      */
     public function destroy(ExpenseCategory $expenseCategory)
     {
+        $this->authorize('delete', $expenseCategory);
         // Only allow deleting custom categories
         if (!$expenseCategory->is_custom) {
             return redirect()->route('expense-categories.index')
