@@ -294,6 +294,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             ->middleware('permission:recurring_invoices.toggle')->name('toggle');
     });
 
+    // ---- Admin modules ------------------------------------------------------
+    // Loaded here so they inherit auth:sanctum + active from this group.
+    require __DIR__ . '/admin.php';
+
     // ---- Services -----------------------------------------------------------
     Route::get('services', [ServiceController::class, 'index'])
         ->middleware('permission:services.view')->name('services.index');
