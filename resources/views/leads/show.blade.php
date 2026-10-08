@@ -276,16 +276,18 @@
                                 <textarea name="note" rows="2" placeholder="Write a note..."
                                     class="w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-gray-200 text-sm p-3"></textarea>
                                 <div class="flex justify-between items-center mt-3">
+                                    @can('leads.notes.create')
                                     <label class="flex items-center text-xs text-gray-600 dark:text-gray-400">
-                                        @if(auth()->user()->isAdmin())
-                                            <input type="checkbox" name="is_internal" value="1"
-                                                class="mr-2 rounded border-gray-300 text-blue-600">
-                                            Internal Note
-                                        @endif
+                                        <input type="checkbox" name="is_internal" value="1"
+                                            class="mr-2 rounded border-gray-300 text-blue-600">
+                                        Internal Note
                                     </label>
+                                    @endcan
+                                    @can('leads.notes.create')
                                     <button type="submit"
                                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">Post
                                         Note</button>
+                                    @endcan
                                 </div>
                             </form>
                         </div>

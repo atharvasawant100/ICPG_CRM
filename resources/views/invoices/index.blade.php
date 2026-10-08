@@ -6,10 +6,12 @@
 @section('content')
     <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">All Invoices</h2>
+        @can('invoices.create')
         <a href="{{ route('invoices.create') }}"
             class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-500 dark:hover:to-blue-600">
             Create Invoice
         </a>
+        @endcan
     </div>
 
     <!-- Filters Panel -->
@@ -90,12 +92,17 @@
                                     <a href="{{ route('invoices.show', $invoice) }}"
                                         class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 transition-colors">View</a>
                                     @if(in_array($invoice->status, ['draft', 'sent']) && $invoice->payments_count === 0)
+@can('invoices.edit')
                                         <a href="{{ route('invoices.edit', $invoice) }}"
                                             class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">Edit</a>
+@endcan
                                     @endif
+@can('invoices.export')
                                     <a href="{{ route('invoices.pdf', $invoice) }}"
                                         class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60 transition-colors">PDF</a>
+@endcan
                                     @if($invoice->status === 'draft')
+@can('invoices.delete')
                                         <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="inline"
                                             onsubmit="return confirm('Delete invoice {{ $invoice->invoice_number }} permanently?');">
                                             @csrf
@@ -105,6 +112,7 @@
                                                 Delete
                                             </button>
                                         </form>
+@endcan
                                     @endif
                                 </div>
                             </td>

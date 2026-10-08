@@ -194,7 +194,7 @@
                             <svg id="theme-icon-dark" class="w-5 h-5 block dark:hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
                         </button>
                         <!-- Notification Bell (Admin Only) -->
-                        @if(auth()->user()->isAdmin())
+                        @can('dashboard.view')
                         <div class="relative group">
                             <button type="button" class="relative p-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500" 
                                     onclick="toggleNotifications()"
@@ -329,8 +329,8 @@
                                 </div>
                             </div>
                         </div>
-                        @endif
-                        
+                        @endcan
+
                         <!-- Current Time and Date -->
                         <div id="current-datetime" class="text-right">
                             <div class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200" id="current-time"></div>
@@ -342,6 +342,29 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                             </svg>
                             <span class="text-sm font-medium hidden md:inline">{{ Auth::user()->name }}</span>
+
+                            {{-- Role badge: display only. Every access decision is
+                                 made by policies and middleware, never here.
+                                 Note: no @if inside a tag attribute, which
+                                 breaks Blade's compiler for everything after it. --}}
+                            @php
+                                $headerRoleName = Auth::user()->getRoleNames()->first();
+                                $headerDepartment = Auth::user()->department;
+                                $headerBadgeTitle = $headerDepartment
+                                    ? 'Department: '.ucfirst($headerDepartment)
+                                    : null;
+                            @endphp
+                            @if ($headerRoleName)
+                                <span title="{{ $headerBadgeTitle }}"
+                                    class="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300 text-[11px] font-semibold leading-5">
+                                    Role: {{ ucfirst($headerRoleName) }}
+                                    @if ($headerDepartment)
+                                        <span
+                                            class="hidden lg:inline font-normal opacity-80">&middot;
+                                            {{ ucfirst($headerDepartment) }}</span>
+                                    @endif
+                                </span>
+                            @endif
                         </a>
                     </div>
                 </div>

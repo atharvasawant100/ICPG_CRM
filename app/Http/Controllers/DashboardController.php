@@ -8,8 +8,11 @@ use App\Models\LeadActivity;
 use App\Models\LeadFollowup;
 use App\Models\Expense;
 use App\Models\Invoice;
+use App\Rbac\Rbac;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Spatie\Permission\Models\Role;
 
 class DashboardController extends Controller
 {
@@ -18,9 +21,13 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
-        // CHANGED: dashboard is now permission-gated (dashboard.view). Admin
-        // is unaffected via Gate::before.
-        $this->authorize('viewAny', \App\Policies\DashboardPolicy::class);
+        /*
+         | CHANGED: the dashboard is now permission-gated on dashboard.view.
+         | Checked via Gate directly rather than authorize() with a bare policy
+         | class, because Gate cannot resolve an unregistered class argument
+         | and would deny every non-admin. Admin is unaffected via Gate::before.
+         */
+        abort_unless(Gate::allows('dashboard.view'), 403);
 
         $user = $request->user();
 
@@ -322,6 +329,8 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
+        $roleSummary = $this->buildRoleSummary();
+
         return view('dashboard.index', compact(
             'totalCustomers',
             'totalLeads',
@@ -362,8 +371,96 @@ class DashboardController extends Controller
             'inactiveCustomers',
             'recentActivities',
             'upcomingFollowups',
-            'upcomingMeetings'
+            'upcomingMeetings',
+            'roleSummary'
         ));
+    }
+
+    /**
+     * Build the "Users & Roles" summary shown at the bottom of the dashboard.
+     *
+     * Both columns are derived from real data, never hard-coded text:
+     *  - "Can access" groups the role's actual permissions by module.
+     *  - "Data scope" comes from the role_module_scopes table via DataScope,
+     *    so it always matches what the scope helper will enforce.
+     */
+    private function buildRoleSummary(): array
+    {
+        $scopeLabels = [
+            \App\Rbac\DataScope::OWN => 'Own records',
+            \App\Rbac\DataScope::TEAM => 'Own + direct reports',
+            \App\Rbac\DataScope::ALL => 'All records',
+        ];
+
+        $summary = [];
+
+        foreach (Role::orderBy('name')->get() as $role) {
+            $isAdmin = $role->name === Rbac::ADMIN_ROLE;
+
+            if ($isAdmin) {
+                $access = 'All modules, users, roles, settings';
+                $scope = 'All records';
+            } else {
+                // Group the role's real permissions by module.
+                $byModule = [];
+
+                foreach ($role->permissions->pluck('name') as $permissionName) {
+                    [$module, $action] = array_pad(explode('.', $permissionName, 2), 2, null);
+
+                    $byModule[$module][] = $action;
+                }
+
+                if ($byModule === []) {
+                    $access = 'No modules yet';
+                } else {
+                    $parts = [];
+
+                    foreach ($byModule as $module => $actions) {
+                        // sort(), not ksort(): the action list is a sequential
+                        // array, so ksort is a no-op and would leave the
+                        // output in database order.
+                        $actions = array_unique($actions);
+                        sort($actions);
+
+                        $label = ucfirst(str_replace('_', ' ', $module));
+                        $parts[] = $label.' ('.implode(', ', $actions).')';
+                    }
+
+                    $access = implode(' · ', $parts);
+                }
+
+                $scopes = [];
+
+                foreach (array_keys(config('rbac.owner_columns', [])) as $module) {
+                    $resolved = \App\Rbac\DataScope::scopeForRole($role->name, $module) ?? \App\Rbac\DataScope::OWN;
+
+                    $scopes[$resolved][] = str_replace('_', ' ', $module);
+                }
+
+                if ($scopes === []) {
+                    $scope = 'Not applicable';
+                } else {
+                    $scopeParts = [];
+
+                    foreach ($scopes as $value => $modules) {
+                        $scopeParts[] = ($scopeLabels[$value] ?? 'Own records').': '.implode(', ', $modules);
+                    }
+
+                    $scope = implode(' · ', $scopeParts);
+                }
+            }
+
+            $summary[] = [
+                'model' => $role,
+                'name' => $role->name,
+                'is_admin' => $isAdmin,
+                'users_count' => $role->users()->count(),
+                'access' => $access,
+                'scope' => $scope,
+            ];
+        }
+
+        return $summary;
     }
 
     /**

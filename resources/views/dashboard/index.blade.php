@@ -81,7 +81,7 @@ $growthBadge = function (?float $pct, bool $invert = false) {
         </div>
     </div>
     <div class="kpi-grid grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
-        <!-- Paid Amount -->
+        @can('invoices.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-green-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-green-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -94,7 +94,8 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
-        <!-- Overdue -->
+        @endcan
+        @can('invoices.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-red-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-red-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -107,7 +108,8 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
-        <!-- Monthly Revenue -->
+        @endcan
+        @can('invoices.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-teal-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-teal-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -120,7 +122,8 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
-        <!-- Monthly Expenses -->
+        @endcan
+        @can('expenses.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-orange-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-orange-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -133,7 +136,8 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
-        <!-- Total Leads -->
+        @endcan
+        @can('leads.view')
         <a href="{{ route('leads.index') }}" class="group relative block cursor-pointer overflow-hidden bg-gradient-to-br from-blue-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-blue-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -146,7 +150,7 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </a>
-        <!-- Converted -->
+        @can('leads.view')
         <a href="{{ route('leads.index', ['status' => 'converted']) }}" class="group relative block cursor-pointer overflow-hidden bg-gradient-to-br from-emerald-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-emerald-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -159,7 +163,7 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </a>
-        <!-- Conversion Rate -->
+        @can('leads.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-purple-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-purple-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -172,7 +176,10 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
-        <!-- Total Invoices -->
+        @endcan
+        @endcan
+        @endcan
+        @can('invoices.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-indigo-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-indigo-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -185,7 +192,8 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
-        <!-- Net Profit -->
+        @endcan
+        @can('invoices.view')
         <div class="group relative overflow-hidden bg-gradient-to-br from-cyan-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border border-cyan-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="flex items-start justify-between">
                 <div>
@@ -198,6 +206,7 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 </div>
             </div>
         </div>
+        @endcan
     </div>
 </div>
 
@@ -207,42 +216,54 @@ $growthBadge = function (?float $pct, bool $invert = false) {
 <div class="mb-8 dash-animate dash-animate-delay-1">
     <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4">Quick Actions</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        @can('leads.create')
         <a href="{{ route('leads.create.manual') }}" class="flex flex-col items-center justify-center p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group">
             <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </div>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 text-center">New Lead</span>
         </a>
+        @endcan
+        @can('invoices.create')
         <a href="{{ route('invoices.create') }}" class="flex flex-col items-center justify-center p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group">
             <div class="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 text-center">New Invoice</span>
         </a>
+        @endcan
+        @can('expenses.create')
         <a href="{{ route('expenses.create') }}" class="flex flex-col items-center justify-center p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group">
             <div class="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 text-center">Add Expense</span>
         </a>
+        @endcan
+        @can('customers.create')
         <a href="{{ route('customers.create') }}" class="flex flex-col items-center justify-center p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group">
             <div class="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
             </div>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 text-center">Add Customer</span>
         </a>
+        @endcan
+        @can('followups.view')
         <a href="{{ route('leads.calendar') }}" class="flex flex-col items-center justify-center p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group">
             <div class="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             </div>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 text-center">Follow-up Calendar</span>
         </a>
+        @endcan
+        @can('recurring_invoices.view')
         <a href="{{ route('recurring-invoices.create') }}" class="flex flex-col items-center justify-center p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group">
             <div class="w-12 h-12 rounded-xl bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             </div>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 text-center">Recurring Invoice</span>
         </a>
+        @endcan
     </div>
 </div>
 
@@ -252,17 +273,45 @@ $growthBadge = function (?float $pct, bool $invert = false) {
 <div class="mb-8 dash-animate dash-animate-delay-2">
     <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4">Analytics</h2>
     <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+        @php
+    /*
+     | Analytics tabs. A tab the user cannot view is not rendered, and the first
+     | permitted tab becomes the default so the panel is never blank.
+     */
+    $chartTabs = [
+        'leads' => ['label' => 'Leads', 'permission' => 'leads.view'],
+        'invoices' => ['label' => 'Invoices', 'permission' => 'invoices.view'],
+        'expenses' => ['label' => 'Expenses', 'permission' => 'expenses.view'],
+        'revenue' => ['label' => 'Revenue', 'permission' => 'invoices.view'],
+    ];
+
+    $allowedChartTabs = array_filter(
+        $chartTabs,
+        fn ($tab) => auth()->user()?->can($tab['permission'])
+    );
+
+    $activeChartTab = array_key_first($allowedChartTabs);
+@endphp
+
         <div class="border-b border-gray-200 dark:border-gray-700 px-2 sm:px-4 overflow-x-auto">
             <div class="flex min-w-max -mb-px">
-                <button type="button" onclick="showChartTab('leads')" id="tab-leads" class="chart-tab active px-4 sm:px-6 py-3.5 text-sm font-semibold text-gray-600 dark:text-gray-300 border-b-2 border-transparent whitespace-nowrap">Leads</button>
-                <button type="button" onclick="showChartTab('invoices')" id="tab-invoices" class="chart-tab px-4 sm:px-6 py-3.5 text-sm font-semibold text-gray-600 dark:text-gray-300 border-b-2 border-transparent whitespace-nowrap">Invoices</button>
-                <button type="button" onclick="showChartTab('expenses')" id="tab-expenses" class="chart-tab px-4 sm:px-6 py-3.5 text-sm font-semibold text-gray-600 dark:text-gray-300 border-b-2 border-transparent whitespace-nowrap">Expenses</button>
-                <button type="button" onclick="showChartTab('revenue')" id="tab-revenue" class="chart-tab px-4 sm:px-6 py-3.5 text-sm font-semibold text-gray-600 dark:text-gray-300 border-b-2 border-transparent whitespace-nowrap">Revenue</button>
+                @foreach ($allowedChartTabs as $key => $tab)
+                    <button type="button" onclick="showChartTab('{{ $key }}')" id="tab-{{ $key }}"
+                        class="chart-tab {{ $key === $activeChartTab ? 'active' : '' }} px-4 sm:px-6 py-3.5 text-sm font-semibold text-gray-600 dark:text-gray-300 border-b-2 border-transparent whitespace-nowrap">
+                        {{ $tab['label'] }}</button>
+                @endforeach
             </div>
         </div>
 
+        @if ($activeChartTab === null)
+            <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                No analytics available for your permissions.
+            </div>
+        @endif
+
         <!-- Leads Tab -->
-        <div id="panel-leads" class="chart-panel p-4 sm:p-6">
+        @can('leads.view')
+        <div id="panel-leads" class="chart-panel p-4 sm:p-6 {{ $activeChartTab === 'leads' ? '' : 'hidden' }}">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-700">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-white mb-4">Lead Conversion Funnel</h3>
@@ -305,8 +354,11 @@ $growthBadge = function (?float $pct, bool $invert = false) {
             </div>
         </div>
 
+        @endcan
+
         <!-- Invoices Tab -->
-        <div id="panel-invoices" class="chart-panel hidden p-4 sm:p-6">
+        @can('invoices.view')
+        <div id="panel-invoices" class="chart-panel p-4 sm:p-6 {{ $activeChartTab === 'invoices' ? '' : 'hidden' }}">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-100 dark:border-green-800">
                     <p class="text-xs text-gray-600 dark:text-gray-400">Paid</p>
@@ -363,7 +415,11 @@ $growthBadge = function (?float $pct, bool $invert = false) {
         </div>
 
         <!-- Expenses Tab -->
-        <div id="panel-expenses" class="chart-panel hidden p-4 sm:p-6">
+        @endcan
+
+        <!-- Expenses Tab -->
+        @can('expenses.view')
+        <div id="panel-expenses" class="chart-panel p-4 sm:p-6 {{ $activeChartTab === 'expenses' ? '' : 'hidden' }}">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-700">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-white mb-4">Expenses by Category</h3>
@@ -381,7 +437,11 @@ $growthBadge = function (?float $pct, bool $invert = false) {
         </div>
 
         <!-- Revenue Tab -->
-        <div id="panel-revenue" class="chart-panel hidden p-4 sm:p-6">
+        @endcan
+
+        <!-- Revenue Tab -->
+        @can('invoices.view')
+        <div id="panel-revenue" class="chart-panel p-4 sm:p-6 {{ $activeChartTab === 'revenue' ? '' : 'hidden' }}">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
                 <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-4 border border-teal-100 dark:border-teal-800">
                     <p class="text-xs text-gray-600 dark:text-gray-400">This Month Revenue</p>
@@ -401,11 +461,108 @@ $growthBadge = function (?float $pct, bool $invert = false) {
                 <div class="relative h-80"><canvas id="chartPnL"></canvas></div>
             </div>
         </div>
+        @endcan
     </div>
 </div>
 
 <!-- ============================================ -->
-<!-- SECTION 4: WIDGETS -->
+<!-- SECTION 4: USERS & ROLES (admin only)        -->
+<!-- ============================================ -->
+@can('roles.view')
+    <div class="mb-8 dash-animate">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Users &amp; Roles</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    What each role can reach, and how much of it it can see.
+                </p>
+            </div>
+            @can('users.view')
+                <a href="{{ route('admin.users.index') }}"
+                    class="inline-flex items-center bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
+                    Manage Users
+                </a>
+            @endcan
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div class="hidden md:block overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            @foreach (['Role', 'Users', 'Can access', 'Data scope'] as $heading)
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    {{ $heading }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        @foreach ($roleSummary as $summary)
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="font-semibold text-gray-800 dark:text-white">
+                                        {{ ucfirst($summary['name']) }}</span>
+                                    @if ($summary['is_admin'])
+                                        <span
+                                            class="ml-2 px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300 text-[10px] font-bold uppercase">
+                                            Full access</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    {{ $summary['users_count'] }}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ $summary['access'] }}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ $summary['scope'] }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @can('roles.edit')
+                                        <a href="{{ route('admin.roles.edit', $summary['model']) }}"
+                                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                            Edit permissions
+                                        </a>
+                                    @else
+                                        <span class="text-xs text-gray-400 italic">View only</span>
+                                    @endcan
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
+                @foreach ($roleSummary as $summary)
+                    <div class="p-4">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="font-semibold text-gray-800 dark:text-white">
+                                {{ ucfirst($summary['name']) }}</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ $summary['users_count'] }} user(s)</span>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Can access:</span>
+                            {{ $summary['access'] }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Data scope:</span>
+                            {{ $summary['scope'] }}</p>
+                        @can('roles.edit')
+                            <a href="{{ route('admin.roles.edit', $summary['model']) }}"
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                Edit permissions</a>
+                        @endcan
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endcan
+
+<!-- ============================================ -->
+<!-- SECTION 5: WIDGETS -->
 <!-- ============================================ -->
 <div class="mb-8 dash-animate dash-animate-delay-3">
     <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4">Overview Widgets</h2>

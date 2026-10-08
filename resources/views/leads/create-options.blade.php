@@ -43,7 +43,7 @@
             </a>
 
             <!-- Option 2: Bulk Import via XLSX -->
-            @if(auth()->user()->isAdmin())
+            @can('leads.import')
                 <a href="{{ route('leads.create.bulk') }}"
                     class="group bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-5 sm:p-6 hover:shadow-xl hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-300 hover:-translate-y-1 cursor-pointer block">
                     <div class="flex flex-col items-center text-center">
@@ -72,7 +72,7 @@
                         </span>
                     </div>
                 </a>
-            @endif
+            @endcan
 
             <!-- Option 3: Meta Integration (Coming Soon) -->
             <div

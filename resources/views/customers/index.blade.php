@@ -6,10 +6,12 @@
 @section('content')
     <div class="mb-4 flex flex-row justify-between items-center gap-3 sm:gap-4">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">All Customers</h2>
+        @can('customers.create')
         <a href="{{ route('customers.create') }}"
             class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 whitespace-nowrap">
             Add Customer
         </a>
+        @endcan
     </div>
 
 
@@ -52,14 +54,22 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                @can('customers.edit')
+                                @can('customers.edit')
                                 <a href="{{ route('customers.edit', $customer) }}"
                                     class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3 font-semibold">Edit</a>
+                                @endcan
+                                @endcan
+                                @can('customers.delete')
+@can('customers.delete')
                                 <form action="{{ route('customers.destroy', $customer) }}" method="POST" class="inline"
                                     onsubmit="return confirm('Are you sure you want to delete this customer?');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="text-red-600 hover:text-red-800 font-semibold">Delete</button>
                                 </form>
+@endcan
+                                @endcan
                             </td>
                         </tr>
                     @empty

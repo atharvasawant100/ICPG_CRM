@@ -119,7 +119,7 @@
                                     <button type="submit"
                                         class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold">Restore</button>
                                 </form>
-                                @if(auth()->user()->isAdmin())
+                                @can('leads.delete')
                                     <form action="{{ route('leads.force-delete', $lead->id) }}" method="POST" class="inline"
                                         onsubmit="return confirm('Permanently delete this lead? This cannot be undone.');">
                                         @csrf
@@ -128,7 +128,7 @@
                                             class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold">Delete
                                             Permanently</button>
                                     </form>
-                                @endif
+                                @endcan
                             </td>
                         </tr>
                     @empty
@@ -167,7 +167,7 @@
                             <button type="submit"
                                 class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-semibold">Restore</button>
                         </form>
-                        @if(auth()->user()->isAdmin())
+                        @can('leads.delete')
                             <form action="{{ route('leads.force-delete', $lead->id) }}" method="POST" class="inline"
                                 onsubmit="return confirm('Delete permanently?');">
                                 @csrf
@@ -175,7 +175,7 @@
                                 <button type="submit"
                                     class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-semibold">Delete</button>
                             </form>
-                        @endif
+                        @endcan
                     </div>
                 </div>
             @empty

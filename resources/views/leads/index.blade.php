@@ -7,10 +7,14 @@
     <div class="mb-4">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-3 sm:mb-4">All Leads</h2>
         <div class="flex flex-row gap-3">
+            @can('leads.create')
+
             <a href="{{ route('leads.create') }}"
                 class="flex-1 sm:flex-initial bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 text-center">
                 Add Lead
             </a>
+
+            @endcan
             <button type="button" onclick="toggleFilters()"
                 class="flex-1 sm:flex-initial bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 flex items-center justify-center gap-2">
                 <span>Filters</span>
@@ -164,19 +168,23 @@
                                         class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">Edit</a>
                                     @if($lead->isConverted())
                                         <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Converted</span>
-                                    @elseif($lead->status !== 'lost')
+                                    @elseif($lead->status !== 'lost')@can('leads.convert')
+
                                         <form action="{{ route('leads.convert', $lead) }}" method="POST" class="inline"
                                             onsubmit="return confirm('Convert to customer?');">
                                             @csrf
                                             <button type="submit" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60 transition-colors">Convert</button>
                                         </form>
-                                    @endif
+@endcan
+                                    @endif@can('leads.delete')
+
                                     <form action="{{ route('leads.destroy', $lead) }}" method="POST" class="inline"
                                         onsubmit="return confirm('Are you sure you want to delete this lead?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60 transition-colors">Delete</button>
                                     </form>
+@endcan
                                 </div>
                             </td>
                         </tr>

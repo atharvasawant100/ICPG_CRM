@@ -105,8 +105,9 @@
             </div>
         </div>
 
-        <!-- Approval Section (Admin only, for pending expenses) -->
-        @if(auth()->user()->isAdmin() && $expense->isPending())
+        <!-- Approval Section (requires expenses.approve, for pending expenses) -->
+        @if($expense->isPending())
+            @can('expenses.approve')
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-5 md:p-6 border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                 <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Approve/Reject Expense</h3>
                 <form action="{{ route('expenses.approve', $expense) }}" method="POST" id="approval-form">
@@ -133,6 +134,7 @@
                     </div>
                 </form>
             </div>
+                @endcan
         @endif
     </div>
 

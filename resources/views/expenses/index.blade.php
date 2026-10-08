@@ -9,10 +9,12 @@
             {{ $title ?? 'Expenses' }}
         </h2>
         <div class="flex flex-row gap-3">
+            @can('expenses.create')
             <a href="{{ route('expenses.create') }}"
                 class="flex-1 sm:flex-initial bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 text-center">
                 Add New Expense
             </a>
+            @endcan
             <button type="button" onclick="toggleFilters()"
                 class="flex-1 sm:flex-initial bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 flex items-center justify-center gap-2">
                 <span>Filters</span>
@@ -176,14 +178,16 @@
                                 <a href="{{ route('expenses.show', $expense) }}"
                                     class="text-blue-600 dark:text-blue-400 hover:text-blue-800 mr-3 font-semibold">View</a>
                                 @if($expense->isPending())
+@can('expenses.edit')
                                     <a href="{{ route('expenses.edit', $expense) }}"
                                         class="text-blue-600 dark:text-blue-400 hover:text-blue-800 mr-3 font-semibold">Edit</a>
-                                    @if(auth()->user()->isAdmin())
+@endcan
+                                    @can('expenses.approve')
                                         <button onclick="approveExpense({{ $expense->id }})"
                                             class="text-green-600 dark:text-green-400 hover:text-green-800 mr-3 font-semibold">Approve</button>
                                         <button onclick="rejectExpense({{ $expense->id }})"
                                             class="text-red-600 dark:text-red-400 hover:text-red-800 font-semibold">Reject</button>
-                                    @endif
+                                    @endcan
                                 @endif
                             </td>
                         </tr>
@@ -238,14 +242,16 @@
                         <a href="{{ route('expenses.show', $expense) }}"
                             class="text-blue-600 dark:text-blue-400 hover:text-blue-800 text-sm font-semibold">View</a>
                         @if($expense->isPending())
+                            @can('expenses.edit')
                             <a href="{{ route('expenses.edit', $expense) }}"
                                 class="text-blue-600 dark:text-blue-400 hover:text-blue-800 text-sm font-semibold">Edit</a>
-                            @if(auth()->user()->isAdmin())
+                            @endcan
+                            @can('expenses.approve')
                                 <button onclick="approveExpense({{ $expense->id }})"
                                     class="text-green-600 dark:text-green-400 hover:text-green-800 text-sm font-semibold">Approve</button>
                                 <button onclick="rejectExpense({{ $expense->id }})"
                                     class="text-red-600 dark:text-red-400 hover:text-red-800 text-sm font-semibold">Reject</button>
-                            @endif
+                            @endcan
                         @endif
                     </div>
                 </div>
@@ -261,8 +267,8 @@
         @endif
     </div>
 
-    <!-- Approval Modal (Admin only) -->
-    @if(auth()->user()->isAdmin())
+    <!-- Approval Modal (requires expenses.approve) -->
+    @can('expenses.approve')
         <div id="approval-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div
                 class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800 dark:border-gray-700">
@@ -331,5 +337,5 @@
                 }
             }
         </script>
-    @endif
+    @endcan
 @endsection

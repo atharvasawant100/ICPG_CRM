@@ -6,10 +6,12 @@
 @section('content')
     <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Recurring Invoice Templates</h2>
+        @can('recurring_invoices.create')
         <a href="{{ route('recurring-invoices.create') }}"
             class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
             Create Template
         </a>
+        @endcan
     </div>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 transition-colors duration-200">
@@ -97,8 +99,11 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <a href="{{ route('recurring-invoices.show', $template) }}"
                                     class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3 font-semibold">View</a>
+@can('recurring_invoices.edit')
                                 <a href="{{ route('recurring-invoices.edit', $template) }}"
                                     class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3 font-semibold">Edit</a>
+@endcan
+@can('recurring_invoices.toggle')
                                 <form action="{{ route('recurring-invoices.toggle', $template) }}" method="POST" class="inline"
                                     onsubmit="return confirm('Are you sure you want to {{ $template->is_active ? 'deactivate' : 'activate' }} this template?');">
                                     @csrf
@@ -107,6 +112,7 @@
                                         {{ $template->is_active ? 'Deactivate' : 'Activate' }}
                                     </button>
                                 </form>
+@endcan
                             </td>
                         </tr>
                     @empty
