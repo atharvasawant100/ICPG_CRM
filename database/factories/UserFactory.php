@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
+use App\Rbac\Rbac;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -28,9 +30,43 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => 'admin',
+            'is_active' => true,
+            // 'role' is intentionally omitted. It is a read-only mirror of the
+            // Spatie role, so a factory that sets it directly would create
+            // exactly the drift RoleMirrorIntegrityTest guards against.
+            // Use ->admin() or ->withRbacRole() to grant a real role.
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * A user holding the admin role.
+     */
+    public function admin(): static
+    {
+        return $this->afterCreating(function (User $user) {
+            $user->assignRbacRole(Rbac::ADMIN_ROLE);
+        });
+    }
+
+    /**
+     * A user holding a specific Spatie role.
+     */
+    public function withRbacRole(string $role): static
+    {
+        return $this->afterCreating(function (User $user) use ($role) {
+            $user->assignRbacRole($role);
+        });
+    }
+
+    /**
+     * A deactivated user.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
     }
 
     /**

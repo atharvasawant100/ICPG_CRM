@@ -8,11 +8,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
+use Throwable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens, HasRoles, \App\Rbac\AssignsRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -23,7 +25,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',
+        // 'role' is a read-only mirror of the Spatie role. It is deliberately
+        // NOT mass assignable: role changes must go through assignRbacRole().
+        'department',
+        'manager_id',
+        'is_active',
     ];
 
     /**
@@ -46,15 +52,49 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 
     /**
-     * Check if user is admin
+     * Check if the user is an administrator.
+     *
+     * Spatie is the source of truth. The legacy users.role column is only read
+     * as a fallback, because isAdmin() runs on every request via
+     * EnsureUserIsAdmin and must not throw while the permission tables are
+     * absent or a migration is half-applied.
      */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        try {
+            return $this->hasRole(\App\Rbac\Rbac::ADMIN_ROLE);
+        } catch (Throwable) {
+            return $this->getAttribute('role') === \App\Rbac\Rbac::ADMIN_ROLE;
+        }
+    }
+
+    /**
+     * The user's manager.
+     */
+    public function manager(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'manager_id');
+    }
+
+    /**
+     * Users reporting to this user.
+     */
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(self::class, 'manager_id');
+    }
+
+    /**
+     * Active users only. Used as the default scope for admin listings.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     /**
