@@ -8,7 +8,7 @@
         <div>
             <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Departments</h2>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                The departments a user can be assigned to, and who manages each one.
+                The departments a user can be assigned to. Every department has a manager.
             </p>
         </div>
 
@@ -27,6 +27,17 @@
         <div
             class="mb-4 sm:mb-5 bg-green-50 dark:bg-green-900/30 border-l-4 border-green-500 text-green-800 dark:text-green-200 px-4 py-3 rounded-lg text-sm">
             {{ session('success') }}
+        </div>
+    @endif
+
+    {{-- A manager is required, so say it plainly when there is nobody to pick.
+         Without this the dropdown would be empty and the page unusable. --}}
+    @if ($managers->isEmpty())
+        <div
+            class="mb-4 sm:mb-5 bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-500 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg text-sm">
+            No active user holds the admin or manager role, so there is nobody to assign as a
+            department manager. Create or promote one on the
+            <a href="{{ route('admin.users.index') }}" class="underline font-semibold">Users</a> page first.
         </div>
     @endif
 
@@ -76,10 +87,12 @@
                     <div>
                         <label for="manager_id"
                             class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
-                            Manager</label>
-                        <select name="manager_id" id="manager_id"
+                            Manager *</label>
+                        <select name="manager_id" id="manager_id" required
                             class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-                            <option value="">No manager yet</option>
+                            {{-- Disabled placeholder: a manager is required, so an
+                                 empty manager_id must not be submittable. --}}
+                            <option value="" disabled @selected(! old('manager_id'))>Choose a manager</option>
                             @foreach ($managers as $manager)
                                 <option value="{{ $manager->id }}"
                                     {{ (int) old('manager_id') === $manager->id ? 'selected' : '' }}>
@@ -155,21 +168,23 @@
                                     {{-- The manager list stays visible, so changing the
                                          manager needs no separate page. --}}
                                     <form action="{{ route('admin.departments.update', $department) }}"
-                                        method="POST"
-                                        class="flex items-center gap-2"
-                                        onsubmit="return confirm('Save the manager for {{ ucfirst($department->name) }}?');">
+                                        method="POST" class="flex items-center gap-2">
                                         @csrf
                                         @method('PUT')
 
-                                        <select name="manager_id"
+                                        <select name="manager_id" required
                                             class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-                                            <option value="">No manager</option>
                                             {{-- Keep the current manager selectable even if
-                                                 they no longer meet the eligibility rule. --}}
+                                                 they no longer meet the eligibility rule,
+                                                 so saving does not silently swap them. --}}
                                             @if ($department->manager && ! $managers->contains($department->manager))
                                                 <option value="{{ $department->manager->id }}" selected>
                                                     {{ $department->manager->name }} — {{ $department->manager->email }}
                                                 </option>
+                                            @elseif (! $department->manager_id)
+                                                {{-- The four pre-existing departments have no
+                                                     manager yet until one is picked. --}}
+                                                <option value="" disabled selected>Choose a manager</option>
                                             @endif
                                             @foreach ($managers as $manager)
                                                 <option value="{{ $manager->id }}"
@@ -186,7 +201,7 @@
                                     </form>
                                 @else
                                     <span class="text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $department->manager?->name ?? 'No manager' }}
+                                        {{ $department->manager?->name ?? 'Not set' }}
                                     </span>
                                 @endcan
                             </td>
@@ -230,18 +245,18 @@
                         {{ $department->users_count }} user(s)</p>
 
                     @can('departments.edit')
-                        <form action="{{ route('admin.departments.update', $department) }}" method="POST"
-                            onsubmit="return confirm('Save the manager for {{ ucfirst($department->name) }}?');">
+                        <form action="{{ route('admin.departments.update', $department) }}" method="POST">
                             @csrf
                             @method('PUT')
                             <div class="flex items-center gap-2">
-                                <select name="manager_id"
+                                <select name="manager_id" required
                                     class="flex-1 shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-                                    <option value="">No manager</option>
                                     @if ($department->manager && ! $managers->contains($department->manager))
                                         <option value="{{ $department->manager->id }}" selected>
                                             {{ $department->manager->name }} — {{ $department->manager->email }}
                                         </option>
+                                    @elseif (! $department->manager_id)
+                                        <option value="" disabled selected>Choose a manager</option>
                                     @endif
                                     @foreach ($managers as $manager)
                                         <option value="{{ $manager->id }}"
@@ -258,7 +273,7 @@
                         </form>
                     @else
                         <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Manager: {{ $department->manager?->name ?? 'none' }}
+                            Manager: {{ $department->manager?->name ?? 'not set' }}
                         </p>
                     @endcan
                 </div>

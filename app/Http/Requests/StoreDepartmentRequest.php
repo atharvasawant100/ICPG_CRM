@@ -31,7 +31,13 @@ class StoreDepartmentRequest extends FormRequest
                 Rule::unique('departments', 'name'),
             ],
             'description' => ['nullable', 'string', 'max:255'],
-            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+
+            /*
+             | Required: every department has a manager. The dropdown offers only
+             | eligible users, so this catches a forged or empty submission
+             | rather than ordinary use.
+             */
+            'manager_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -51,6 +57,7 @@ class StoreDepartmentRequest extends FormRequest
             $managerId = $this->input('manager_id');
 
             if ($managerId === null) {
+                // Already failed the "required" rule; nothing more to say.
                 return;
             }
 
@@ -80,6 +87,7 @@ class StoreDepartmentRequest extends FormRequest
             'name.required' => 'Please enter a department name.',
             'name.unique' => 'That department already exists.',
             'name.regex' => 'Use letters, numbers, spaces, & or - only.',
+            'manager_id.required' => 'Every department needs a manager.',
             'manager_id.exists' => 'The selected manager does not exist.',
         ];
     }

@@ -22,7 +22,13 @@ class UpdateDepartmentRequest extends FormRequest
     {
         return [
             'description' => ['nullable', 'string', 'max:255'],
-            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+
+            /*
+             | Required even on edit: a department must never be left without a
+             | manager. The form pre-selects the current one, so this is a
+             | no-op for a department that already has one.
+             */
+            'manager_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -57,6 +63,7 @@ class UpdateDepartmentRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'manager_id.required' => 'Every department needs a manager.',
             'manager_id.exists' => 'The selected manager does not exist.',
         ];
     }

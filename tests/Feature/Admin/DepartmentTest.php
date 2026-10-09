@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\Department;
 use App\Models\User;
 use App\Rbac\Rbac;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\Rbac\RbacTestCase;
@@ -113,8 +114,11 @@ class DepartmentTest extends RbacTestCase
 
     public function test_the_name_is_normalised_so_case_never_creates_a_duplicate(): void
     {
+        $manager = $this->managerCandidate();
+
         $this->actingAs($this->admin())->post(route('admin.departments.store'), [
             'name' => '  Finance   Team  ',
+            'manager_id' => $manager->id,
         ])->assertRedirect(route('admin.departments.index'));
 
         $this->assertDatabaseHas('departments', ['name' => 'finance team']);
@@ -131,21 +135,123 @@ class DepartmentTest extends RbacTestCase
 
     public function test_the_name_is_required(): void
     {
+        $manager = $this->managerCandidate();
+
         $this->actingAs($this->admin())
-            ->post(route('admin.departments.store'), ['name' => ''])
+            ->post(route('admin.departments.store'), ['name' => '', 'manager_id' => $manager->id])
             ->assertSessionHasErrors('name');
     }
 
-    public function test_a_department_can_be_added_without_a_manager(): void
+    /**
+     * Every department must have a manager, so omitting one is refused rather
+     * than silently creating a manager-less row.
+     */
+    public function test_a_department_cannot_be_added_without_a_manager(): void
     {
-        $this->actingAs($this->admin())->post(route('admin.departments.store'), [
-            'name' => 'support',
-        ])->assertRedirect(route('admin.departments.index'));
+        $this->actingAs($this->admin())
+            ->post(route('admin.departments.store'), ['name' => 'support'])
+            ->assertSessionHasErrors('manager_id');
 
-        $this->assertDatabaseHas('departments', [
-            'name' => 'support',
-            'manager_id' => null,
-        ]);
+        $this->assertDatabaseMissing('departments', ['name' => 'support']);
+    }
+
+    public function test_an_empty_manager_id_is_refused_on_create(): void
+    {
+        $this->actingAs($this->admin())
+            ->post(route('admin.departments.store'), ['name' => 'support', 'manager_id' => ''])
+            ->assertSessionHasErrors('manager_id');
+
+        $this->assertDatabaseMissing('departments', ['name' => 'support']);
+    }
+
+    /**
+     * Same rule on edit: a department must never be left manager-less, even if
+     * the admin is only changing the description.
+     */
+    public function test_a_department_cannot_be_saved_without_a_manager(): void
+    {
+        $manager = $this->managerCandidate();
+        $department = Department::where('name', 'sales')->first();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.departments.update', $department), [
+                'manager_id' => '',
+                'description' => 'Changed',
+            ])
+            ->assertSessionHasErrors('manager_id');
+
+        $this->assertNull($department->fresh()->description);
+    }
+
+    /**
+     * The dropdowns must not offer "no manager", otherwise the UI would
+     * contradict the validation.
+     */
+    public function test_the_dropdowns_do_not_offer_a_no_manager_option(): void
+    {
+        $html = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+
+        $this->assertStringNotContainsString('No manager', $html);
+        $this->assertStringNotContainsString('value="">No', $html);
+
+        // Every manager select carries the required attribute.
+        foreach ($this->managerSelects($html) as $select) {
+            $this->assertStringContainsString('required', $select);
+        }
+    }
+
+    /**
+     * A department seeded without a manager still shows a prompt to pick one,
+     * rather than silently showing the first person in the list.
+     */
+    public function test_a_department_with_no_manager_prompts_for_one(): void
+    {
+        $html = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+
+        // Department rows only, not the add form, which is the first select.
+        $rowSelects = $this->managerSelects(substr($html, strpos($html, '<tbody')));
+
+        $this->assertNotEmpty($rowSelects);
+        $this->assertStringContainsString('Choose a manager', $rowSelects[0]);
+    }
+
+    /**
+     * Picking a manager for one of the pre-existing departments fills it in.
+     */
+    public function test_an_existing_department_can_be_given_its_first_manager(): void
+    {
+        $manager = $this->managerCandidate();
+        $department = Department::where('name', 'hr')->first();
+
+        $this->assertNull($department->manager_id);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.departments.update', $department), ['manager_id' => $manager->id])
+            ->assertRedirect(route('admin.departments.index'));
+
+        $this->assertSame($manager->id, $department->fresh()->manager_id);
+    }
+
+    /**
+     * With nobody eligible, the page says so instead of showing an empty
+     * dropdown the admin cannot satisfy.
+     */
+    public function test_the_page_explains_when_there_is_nobody_to_choose_as_manager(): void
+    {
+        // The only other admin-role user is the seeded account. Deactivating it
+        // empties the candidate list.
+        User::where('email', RolePermissionSeeder::ADMIN_EMAILS[0])
+            ->update(['is_active' => false]);
+
+        // Act as a plain viewer: an active admin would itself be a candidate.
+        $viewer = $this->userWithPermissions(['departments.view'], 'dept_viewer');
+
+        $this->assertCount(0, Department::managerCandidates());
+
+        $response = $this->actingAs($viewer)->get(route('admin.departments.index'));
+
+        $response->assertSuccessful();
+        $response->assertSee('No active user holds the admin or manager role');
     }
 
     /**
@@ -231,17 +337,27 @@ class DepartmentTest extends RbacTestCase
         $this->assertSame($new->id, $department->fresh()->manager_id);
     }
 
-    public function test_the_manager_can_be_cleared(): void
+    public function test_the_manager_cannot_be_cleared(): void
     {
         $manager = $this->managerCandidate();
+        $replacement = $this->managerCandidate();
         $department = Department::where('name', 'sales')->first();
         $department->update(['manager_id' => $manager->id]);
 
+        // Clearing is refused: a department must always have a manager, so the
+        // manager is replaced rather than removed.
         $this->actingAs($this->admin())
             ->put(route('admin.departments.update', $department), ['manager_id' => ''])
+            ->assertSessionHasErrors('manager_id');
+
+        $this->assertSame($manager->id, $department->fresh()->manager_id);
+
+        // Replacing it works.
+        $this->actingAs($this->admin())
+            ->put(route('admin.departments.update', $department), ['manager_id' => $replacement->id])
             ->assertRedirect(route('admin.departments.index'));
 
-        $this->assertNull($department->fresh()->manager_id);
+        $this->assertSame($replacement->id, $department->fresh()->manager_id);
     }
 
     public function test_changing_the_manager_requires_the_edit_permission(): void
@@ -261,12 +377,13 @@ class DepartmentTest extends RbacTestCase
     public function test_a_department_can_be_deactivated_without_losing_its_users(): void
     {
         $user = User::factory()->create(['department' => 'sales']);
+        $manager = $this->managerCandidate();
 
         $department = Department::where('name', 'sales')->first();
 
         $this->actingAs($this->admin())
             ->put(route('admin.departments.update', $department), [
-                'manager_id' => '',
+                'manager_id' => $manager->id,
                 'is_active' => '0',
             ])
             ->assertRedirect(route('admin.departments.index'));
@@ -275,6 +392,24 @@ class DepartmentTest extends RbacTestCase
 
         // The user's stored department string is untouched.
         $this->assertSame('sales', $user->fresh()->department);
+    }
+
+    /**
+     * Deactivating a department must not orphan its users either: the string
+     * they store still has to validate, or they could not be saved again.
+     */
+    public function test_a_deactivated_department_stays_assignable_to_its_existing_users(): void
+    {
+        $user = User::factory()->create(['department' => 'hr']);
+
+        Department::where('name', 'hr')->update(['is_active' => false]);
+
+        $this->actingAs($this->admin())->put(route('admin.users.update', $user), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => 'hr',
+            'department' => 'hr',
+        ])->assertSessionHasNoErrors();
     }
 
     // ---- Knock-on effect on the Users form -------------------------------
@@ -372,6 +507,22 @@ class DepartmentTest extends RbacTestCase
         $end = strpos($html, '</aside>');
 
         return ($start !== false && $end !== false) ? substr($html, $start, $end - $start) : '';
+    }
+
+    /**
+     * The markup of every <select name="manager_id"> on the page.
+     *
+     * @return array<int, string>
+     */
+    private function managerSelects(string $html): array
+    {
+        preg_match_all(
+            '/<select\b[^>]*name="manager_id"[^>]*>.*?<\/select>/s',
+            $html,
+            $matches
+        );
+
+        return $matches[0] ?? [];
     }
 
     /**
