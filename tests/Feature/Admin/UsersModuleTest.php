@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\AuditLog;
+use App\Models\Department;
 use App\Models\User;
 use App\Rbac\Rbac;
 use App\Services\UserManagementService;
@@ -59,9 +60,9 @@ class UsersModuleTest extends RbacTestCase
             'email' => 'ramesh@example.com',
             'password' => 'secret-password',
             'password_confirmation' => 'secret-password',
-            'role' => 'sales',
+            // No role field: the role is derived from department + designation.
+            'designation' => 'software developer',
             'department' => 'sales',
-            'is_active' => '1',
         ]);
 
         $response->assertRedirect(route('admin.users.index'));
@@ -71,7 +72,7 @@ class UsersModuleTest extends RbacTestCase
 
         $this->assertTrue($created->hasRole('sales'));
         $this->assertSame('sales', $created->getAttribute('role'), 'The mirror must match Spatie.');
-        $this->assertSame('sales', $created->department);
+        $this->assertSame('software developer', $created->designation);
     }
 
     public function test_create_rejects_a_duplicate_email(): void
@@ -84,13 +85,17 @@ class UsersModuleTest extends RbacTestCase
                 'email' => 'taken@example.com',
                 'password' => 'secret-password',
                 'password_confirmation' => 'secret-password',
-                'role' => 'sales',
                 'department' => 'sales',
+                'designation' => 'intern',
             ])
             ->assertSessionHasErrors('email');
     }
 
-    public function test_department_is_required_for_employee_roles(): void
+    /**
+     * A designation needs a department to resolve against, because the
+     * department is what decides the employee's access level.
+     */
+    public function test_a_designation_requires_a_department(): void
     {
         $this->actingAs($this->admin())
             ->post('/admin/users', [
@@ -98,26 +103,111 @@ class UsersModuleTest extends RbacTestCase
                 'email' => 'nodept@example.com',
                 'password' => 'secret-password',
                 'password_confirmation' => 'secret-password',
-                'role' => 'marketing',
+                'designation' => 'team leader',
                 'department' => '',
             ])
             ->assertSessionHasErrors('department');
+
+        $this->assertDatabaseMissing('users', ['email' => 'nodept@example.com']);
     }
 
-    public function test_department_is_optional_for_admin_and_manager(): void
+    /**
+     * A designation from another department's list must be refused, so a
+     * crafted request cannot smuggle one through.
+     */
+    public function test_a_designation_from_another_department_is_rejected(): void
+    {
+        /*
+         | Sets its own per-department lists so the rule is tested regardless of
+         | what config/designations.php currently ships. A designation that is
+         | valid somewhere must still be refused for a department that does not
+         | offer it.
+         */
+        config([
+            'designations.departments' => [
+                'sales' => ['intern' => 'Intern', 'sales executive' => 'Sales Executive'],
+                'development' => ['intern' => 'Intern', 'software developer' => 'Software Developer'],
+            ],
+        ]);
+
+        $this->actingAs($this->admin())
+            ->post('/admin/users', [
+                'name' => 'Mismatch',
+                'email' => 'mismatch@example.com',
+                'password' => 'secret-password',
+                'password_confirmation' => 'secret-password',
+                'designation' => 'sales executive',
+                'department' => 'development',
+            ])
+            ->assertSessionHasErrors('designation');
+
+        $this->assertDatabaseMissing('users', ['email' => 'mismatch@example.com']);
+
+        // The right department accepts it.
+        $this->actingAs($this->admin())
+            ->post('/admin/users', [
+                'name' => 'Matched',
+                'email' => 'matched@example.com',
+                'password' => 'secret-password',
+                'password_confirmation' => 'secret-password',
+                'designation' => 'sales executive',
+                'department' => 'sales',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('users', ['email' => 'matched@example.com']);
+    }
+
+    /**
+     * The department decides the role; only a designation that elevates
+     * overrides it.
+     */
+    public function test_only_an_elevating_designation_changes_the_role(): void
     {
         $admin = $this->admin();
 
+        // Team Leader in development stays an ordinary development employee.
         $this->actingAs($admin)->post('/admin/users', [
-            'name' => 'A Manager',
-            'email' => 'mgr@example.com',
+            'name' => 'Dev Lead',
+            'email' => 'devlead@example.com',
             'password' => 'secret-password',
             'password_confirmation' => 'secret-password',
-            'role' => 'manager',
-            'department' => '',
+            'designation' => 'team leader',
+            'department' => 'development',
         ])->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('users', ['email' => 'mgr@example.com']);
+        $this->assertTrue(User::where('email', 'devlead@example.com')->firstOrFail()->hasRole('development'));
+
+        // Manager elevates.
+        $this->actingAs($admin)->post('/admin/users', [
+            'name' => 'Dev Manager',
+            'email' => 'devmgr@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'designation' => 'manager',
+            'department' => 'development',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue(User::where('email', 'devmgr@example.com')->firstOrFail()->hasRole('manager'));
+    }
+
+    /**
+     * With neither field filled in the user is created with no access at all,
+     * rather than being silently given a department's permissions.
+     */
+    public function test_a_user_with_no_department_is_created_without_access(): void
+    {
+        $this->actingAs($this->admin())->post('/admin/users', [
+            'name' => 'Unconfigured',
+            'email' => 'unconfigured@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+        ])->assertSessionHasNoErrors();
+
+        $created = User::where('email', 'unconfigured@example.com')->firstOrFail();
+
+        $this->assertCount(0, $created->getRoleNames());
+        $this->assertNull($created->department);
     }
 
     public function test_admin_can_edit_a_user_and_the_role_stays_in_sync(): void
@@ -129,7 +219,7 @@ class UsersModuleTest extends RbacTestCase
         $this->actingAs($admin)->put("/admin/users/{$target->id}", [
             'name' => 'Renamed Person',
             'email' => $target->email,
-            'role' => 'development',
+            'designation' => 'team leader',
             'department' => 'development',
             'is_active' => '1',
         ])->assertRedirect(route('admin.users.index'));
@@ -152,7 +242,7 @@ class UsersModuleTest extends RbacTestCase
         $this->actingAs($admin)->put("/admin/users/{$target->id}", [
             'name' => $target->name,
             'email' => $target->email,
-            'role' => 'sales',
+            'designation' => 'intern',
             'department' => 'sales',
             'is_active' => '1',
         ])->assertSessionHasNoErrors();
@@ -168,7 +258,6 @@ class UsersModuleTest extends RbacTestCase
             ->put("/admin/users/{$admin->id}", [
                 'name' => $admin->name,
                 'email' => $admin->email,
-                'role' => Rbac::ADMIN_ROLE,
                 'is_active' => '0',
             ])
             ->assertSessionHasErrors('is_active');
@@ -180,16 +269,38 @@ class UsersModuleTest extends RbacTestCase
     {
         $admin = $this->admin();
 
+        // Any department/designation pair derives a non-admin role, so the
+        // admin would be demoting themselves.
         $this->actingAs($admin)
             ->put("/admin/users/{$admin->id}", [
                 'name' => $admin->name,
                 'email' => $admin->email,
-                'role' => 'sales',
+                'designation' => 'intern',
                 'department' => 'sales',
                 'is_active' => '1',
             ])
-            ->assertSessionHasErrors('role');
+            ->assertSessionHasErrors('department');
 
+        $this->assertTrue($admin->fresh()->hasRole(Rbac::ADMIN_ROLE));
+    }
+
+    /**
+     * Renaming yourself must not silently strip your access, because the form
+     * has no role field for the request to preserve.
+     */
+    public function test_editing_your_own_name_keeps_your_admin_role(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->put("/admin/users/{$admin->id}", [
+                'name' => 'Hitesh Renamed',
+                'email' => $admin->email,
+                'is_active' => '1',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Hitesh Renamed', $admin->fresh()->name);
         $this->assertTrue($admin->fresh()->hasRole(Rbac::ADMIN_ROLE));
     }
 
@@ -256,10 +367,11 @@ class UsersModuleTest extends RbacTestCase
             ->put("/admin/users/{$admin->id}", [
                 'name' => $admin->name,
                 'email' => $admin->email,
-                'role' => 'manager',
+                'designation' => 'manager',
+                'department' => 'sales',
                 'is_active' => '1',
             ])
-            ->assertSessionHasErrors();
+            ->assertSessionHasErrors('department');
 
         $this->assertTrue($admin->fresh()->hasRole(Rbac::ADMIN_ROLE));
     }
@@ -277,54 +389,69 @@ class UsersModuleTest extends RbacTestCase
         $this->assertFalse($other->fresh()->is_active);
     }
 
-    public function test_a_user_cannot_be_their_own_manager(): void
+    /**
+ * The Manager field is gone: the manager comes from the department. A user who
+ * is their own department's manager would report to themselves, so that
+ * department is refused.
+ */
+public function test_a_user_cannot_report_to_themselves(): void
     {
         $admin = $this->admin();
         $target = User::factory()->create();
+
+        Department::where('name', 'sales')->update(['manager_id' => $target->id]);
 
         $this->actingAs($admin)
             ->put("/admin/users/{$target->id}", [
                 'name' => $target->name,
                 'email' => $target->email,
-                'role' => 'sales',
+                'designation' => 'intern',
                 'department' => 'sales',
-                'manager_id' => $target->id,
                 'is_active' => '1',
             ])
-            ->assertSessionHasErrors('manager_id');
+            ->assertSessionHasErrors('department');
+
+        $this->assertNull($target->fresh()->manager_id);
     }
 
+    /**
+     * A department whose manager already sits below this user in the reporting
+     * chain would create a loop.
+     */
     public function test_a_manager_loop_is_rejected(): void
     {
         $admin = $this->admin();
 
-        // chain: a -> b -> c.  Trying to make c report to a creates a cycle.
+        // chain: a -> b -> c. Making a's department managed by c loops.
         $a = User::factory()->create();
         $b = User::factory()->create(['manager_id' => $a->id]);
         $c = User::factory()->create(['manager_id' => $b->id]);
 
-        foreach ([$a, $b, $c] as $node) {
-            $node->assignRbacRole('manager');
-        }
+        Department::where('name', 'sales')->update(['manager_id' => $c->id]);
 
         $this->actingAs($admin)
             ->put("/admin/users/{$a->id}", [
                 'name' => $a->name,
                 'email' => $a->email,
-                'role' => 'manager',
-                'manager_id' => $c->id,
+                'designation' => 'intern',
+                'department' => 'sales',
                 'is_active' => '1',
             ])
-            ->assertSessionHasErrors('manager_id');
+            ->assertSessionHasErrors('department');
 
         $this->assertNotSame($c->id, $a->fresh()->manager_id);
     }
 
-    public function test_a_valid_manager_can_be_assigned(): void
+    /**
+     * The happy path: choosing a department assigns its manager automatically.
+     */
+    public function test_the_department_manager_is_assigned_automatically(): void
     {
         $admin = $this->admin();
         $manager = User::factory()->create();
         $manager->assignRbacRole('manager');
+
+        Department::where('name', 'sales')->update(['manager_id' => $manager->id]);
 
         $target = User::factory()->create();
         $target->assignRbacRole('sales');
@@ -333,14 +460,38 @@ class UsersModuleTest extends RbacTestCase
             ->put("/admin/users/{$target->id}", [
                 'name' => $target->name,
                 'email' => $target->email,
-                'role' => 'sales',
+                'designation' => 'intern',
                 'department' => 'sales',
-                'manager_id' => $manager->id,
                 'is_active' => '1',
             ])
             ->assertSessionHasNoErrors();
 
         $this->assertSame($manager->id, $target->fresh()->manager_id);
+    }
+
+    /**
+     * A new user inherits the department's manager on creation too.
+     */
+    public function test_a_new_user_inherits_the_department_manager(): void
+    {
+        $manager = User::factory()->create();
+        $manager->assignRbacRole('manager');
+
+        Department::where('name', 'hr')->update(['manager_id' => $manager->id]);
+
+        $this->actingAs($this->admin())->post('/admin/users', [
+            'name' => 'New Starter',
+            'email' => 'starter@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'designation' => 'intern',
+            'department' => 'hr',
+        ])->assertSessionHasNoErrors();
+
+        $created = User::where('email', 'starter@example.com')->firstOrFail();
+
+        $this->assertSame($manager->id, $created->manager_id);
+        $this->assertTrue($created->hasRole('hr'));
     }
 
     public function test_deactivated_user_cannot_log_in(): void
@@ -451,8 +602,8 @@ class UsersModuleTest extends RbacTestCase
             'email' => 'audited-user@example.com',
             'password' => 'secret-password',
             'password_confirmation' => 'secret-password',
-            'role' => 'hr',
             'department' => 'hr',
+            'designation' => 'intern',
         ]);
 
         $this->assertDatabaseHas('audit_logs', ['module' => 'users', 'action' => 'create']);

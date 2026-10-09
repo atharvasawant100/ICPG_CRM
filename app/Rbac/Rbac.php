@@ -22,6 +22,25 @@ final class Rbac
     public const ADMIN_ROLE = 'admin';
 
     /**
+     * The role a user gets when their designation is not one that elevates.
+     *
+     * Keyed by department name. A department with no entry falls back to
+     * config/designations.php fallback_role, because departments are editable
+     * and can be added without a matching role.
+     */
+    public const EMPLOYEE_ROLES = [
+        'sales' => 'sales',
+        'marketing' => 'marketing',
+        'development' => 'development',
+        'hr' => 'hr',
+    ];
+
+    /**
+     * The role a department manager gets.
+     */
+    public const MANAGER_ROLE = 'manager';
+
+    /**
      * All seeded roles. Only ADMIN_ROLE is wired up in this phase; the rest are
      * created empty so their permission sets can be defined in later phases.
      */

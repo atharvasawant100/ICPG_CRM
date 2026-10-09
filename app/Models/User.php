@@ -44,6 +44,7 @@ class User extends Authenticatable
         // 'role' is a read-only mirror of the Spatie role. It is deliberately
         // NOT mass assignable: role changes must go through assignRbacRole().
         'department',
+        'designation',
         'manager_id',
         'is_active',
     ];

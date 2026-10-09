@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests;
 
-use App\Http\Requests\Concerns\ValidatesUserDepartment;
+use App\Models\Department;
 use App\Models\User;
+use App\Rbac\Designation;
 use App\Rbac\Rbac;
 use App\Services\UserManagementService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,12 +14,12 @@ use Illuminate\Validation\Validator;
 /**
  * Validation for updating a user.
  *
- * Carries the four self/last-admin protections (rules 1-3 of the spec).
+ * Like StoreUserRequest there is no Role field: the role is derived from the
+ * chosen (department, designation) pair. The self/last-admin protections still
+ * apply, but they now run against the derived role.
  */
 class UpdateUserRequest extends FormRequest
 {
-    use ValidatesUserDepartment;
-
     public function authorize(): bool
     {
         return $this->user()?->can('users.edit') ?? false;
@@ -36,14 +37,20 @@ class UpdateUserRequest extends FormRequest
             ],
             // Optional on edit: leave blank to keep the current password.
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', 'string', Rule::in(Rbac::ROLES)],
-            'department' => $this->departmentRules(),
-            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'designation' => ['nullable', 'string', 'max:100'],
+            'department' => ['nullable', 'string', 'in:'.implode(',', $this->departmentNames())],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
 
-    public function withValidator($validator): void
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'designation' => Designation::slug($this->input('designation')) ?: null,
+        ]);
+    }
+
+    public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
             /** @var User $target */
@@ -52,14 +59,19 @@ class UpdateUserRequest extends FormRequest
             $actor = $this->user();
             $service = app(UserManagementService::class);
 
-            $newRole = (string) $this->input('role');
-            $stillAdmin = $target->hasRole(Rbac::ADMIN_ROLE) && $newRole === Rbac::ADMIN_ROLE;
+            $department = $this->input('department') ?: null;
+            $designation = $this->input('designation') ?: null;
+
+            $newRole = $this->resolvedRole();
             $staysActive = $this->boolean('is_active', true);
 
-            // Rule 1: an admin may not demote, deactivate or delete themselves.
+            // Rule 1: an admin may not demote or deactivate themselves.
             if ($actor && $actor->id === $target->id) {
                 if ($newRole !== Rbac::ADMIN_ROLE) {
-                    $validator->errors()->add('role', 'You cannot change your own role.');
+                    $validator->errors()->add(
+                        'department',
+                        'You cannot change your own role.'
+                    );
                 }
 
                 if (! $staysActive) {
@@ -68,29 +80,95 @@ class UpdateUserRequest extends FormRequest
             }
 
             // Rule 2: never orphan the last active admin.
+            $stillAdmin = $target->hasRole(Rbac::ADMIN_ROLE) && $newRole === Rbac::ADMIN_ROLE;
+
             if ($target->hasRole(Rbac::ADMIN_ROLE) && (! $stillAdmin || ! $staysActive)) {
                 if ($service->wouldOrphanAdmins($target, false)) {
                     $validator->errors()->add(
-                        'role',
+                        'department',
                         'This is the last active admin. Promote another admin first.'
                     );
                 }
             }
 
-            // Rule 4: department required for employee departments.
-            $this->applyDepartmentRules($validator, $newRole, $this->input('department'));
+            // A designation needs a department to resolve against.
+            if ($designation !== null && $department === null) {
+                $validator->errors()->add(
+                    'department',
+                    'Choose a department for this designation.'
+                );
 
-            // Rule 3: self-management and reporting loops.
-            $managerId = $this->input('manager_id');
+                return;
+            }
+
+            if ($designation !== null && $department !== null) {
+                if (! in_array($designation, array_keys(Designation::forDepartment($department)), true)) {
+                    $validator->errors()->add(
+                        'designation',
+                        'That designation is not offered for this department.'
+                    );
+                }
+            }
+
+            // Rule 3: the manager is derived from the department, so the only
+            // way a loop can appear is if the department's manager already sits
+            // below this user in the reporting chain.
+            $managerId = $this->resolvedManagerId();
 
             if ($managerId !== null && (int) $managerId === (int) $target->id) {
-                $validator->errors()->add('manager_id', 'A user cannot be their own manager.');
+                $validator->errors()->add(
+                    'department',
+                    'This user manages that department, so they would report to themselves.'
+                );
             }
 
-            if ($managerId !== null && $service->wouldCreateManagerLoop($target, (int) $managerId)) {
-                $validator->errors()->add('manager_id', 'That choice would create a reporting loop.');
+            if ($managerId !== null && $service->wouldCreateManagerLoop($target, $managerId)) {
+                $validator->errors()->add(
+                    'department',
+                    'This department\'s manager reports to this user, which would create a loop.'
+                );
             }
         });
+    }
+
+    /**
+     * The Spatie role this edit resolves to.
+     *
+     * Falls back to the role the user already holds when the form left both
+     * fields blank, so an unrelated edit (a name typo, say) never silently
+     * strips somebody's access.
+     */
+    public function resolvedRole(): ?string
+    {
+        $department = $this->input('department') ?: null;
+        $designation = $this->input('designation') ?: null;
+
+        if ($department === null && $designation === null) {
+            return $this->route('user')?->getRoleNames()->first();
+        }
+
+        return Designation::roleFor($department, $designation);
+    }
+
+    /**
+     * The manager derived from the department, since the form has no Manager
+     * field.
+     *
+     * Raw on purpose: the self-reporting and loop checks live in
+     * withValidator(), where every other reporting rule is enforced.
+     */
+    public function resolvedManagerId(): ?int
+    {
+        $department = $this->input('department') ?: null;
+
+        if ($department === null) {
+            return null;
+        }
+
+        return Department::query()
+            ->where('name', $department)
+            ->first()
+            ?->managerUserId();
     }
 
     public function messages(): array
@@ -101,9 +179,19 @@ class UpdateUserRequest extends FormRequest
             'email.unique' => 'That email address is already in use.',
             'password.min' => 'The password must be at least 8 characters.',
             'password.confirmed' => 'The two passwords do not match.',
-            'role.required' => 'Please choose a role.',
-            'role.in' => 'That role does not exist.',
-            'manager_id.exists' => 'The selected manager does not exist.',
+            'department.in' => 'That department does not exist.',
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function departmentNames(): array
+    {
+        try {
+            return Department::allNames();
+        } catch (\Throwable) {
+            return array_keys(Rbac::EMPLOYEE_ROLES);
+        }
     }
 }

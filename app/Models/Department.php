@@ -85,7 +85,30 @@ class Department extends Model
     }
 
     /**
-     * Department names, as a flat list for a plain <select>.
+     * The manager a user joining this department reports to.
+     *
+     * The Add User form has no Manager field, so this is derived instead of
+     * typed. It also keeps the "team" data scope working, which resolves
+     * through users.manager_id.
+     *
+     * Returned raw: whether it happens to be the user being edited is a
+     * validation question, answered by the request, so one rule lives in one
+     * place.
+     */
+    public function managerUserId(): ?int
+    {
+        if ($this->manager_id === null) {
+            return null;
+        }
+
+        // Users are deactivated, never deleted, so the row is still there.
+        return User::query()->whereKey($this->manager_id)->exists()
+            ? (int) $this->manager_id
+            : null;
+    }
+
+    /**
+     * Department names for dropdowns, as a flat list for a plain <select>.
      *
      * $activeOnly is false for filter dropdowns so a deactivated department
      * can still be filtered on, and true when assigning a new user.

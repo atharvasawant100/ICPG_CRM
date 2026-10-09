@@ -2,22 +2,27 @@
 
 namespace App\Http\Requests;
 
-use App\Http\Requests\Concerns\ValidatesUserDepartment;
-use App\Models\User;
+use App\Models\Department;
+use App\Rbac\Designation;
 use App\Rbac\Rbac;
 use App\Services\UserManagementService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Validation for creating a user.
+ *
+ * The form has no Role field. Access is derived: Designation::roleFor() turns
+ * the chosen (department, designation) pair into the Spatie role, so this
+ * request never accepts a role from the browser.
  *
  * All rules are server-side. The UI mirrors them with friendly messages, but
  * nothing here trusts the browser.
  */
 class StoreUserRequest extends FormRequest
 {
-    use ValidatesUserDepartment;
     public function authorize(): bool
     {
         return $this->user()?->can('users.create') ?? false;
@@ -34,37 +39,86 @@ class StoreUserRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($this->route('user')?->id),
             ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', 'string', Rule::in(Rbac::ROLES)],
-            'department' => $this->departmentRules(),
-            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'designation' => ['nullable', 'string', 'max:100'],
+            'department' => ['nullable', 'string', 'in:'.implode(',', $this->departmentNames())],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
 
-    public function withValidator($validator): void
+    protected function prepareForValidation(): void
     {
-        $validator->after(function ($validator) {
-            $service = app(UserManagementService::class);
-            $role = $this->input('role');
-            $department = $this->input('department');
-            $managerId = $this->input('manager_id');
+        $this->merge([
+            'designation' => Designation::slug($this->input('designation')) ?: null,
+        ]);
+    }
 
-            // Rule 4: department required for employee departments, optional
-            // for admin and manager.
-            $this->applyDepartmentRules($validator, $role, $department);
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $department = $this->input('department') ?: null;
+            $designation = $this->input('designation') ?: null;
 
-            // Rule 3: no self-management, no loops.
-            if ($managerId !== null && (int) $managerId === (int) optional($this->user())->id) {
-                $validator->errors()->add('manager_id', 'You cannot be your own manager.');
+            // A designation without a department cannot resolve to a role,
+            // because the department is what decides the employee access level.
+            if ($designation !== null && $department === null) {
+                $validator->errors()->add(
+                    'department',
+                    'Choose a department for this designation.'
+                );
+
+                return;
             }
 
-            if ($managerId !== null && $service->wouldCreateManagerLoop(
-                $this->route('user') ?? new User,
-                (int) $managerId
-            )) {
-                $validator->errors()->add('manager_id', 'That choice would create a reporting loop.');
+            // A designation from another department's list must not slip
+            // through just because it happens to exist somewhere in the config.
+            if ($designation !== null && $department !== null) {
+                $allowed = array_keys(Designation::forDepartment($department));
+
+                if (! in_array($designation, $allowed, true)) {
+                    $validator->errors()->add(
+                        'designation',
+                        'That designation is not offered for this department.'
+                    );
+                }
             }
         });
+    }
+
+    /**
+     * The Spatie role this submission resolves to, or null when the user should
+     * be created without one.
+     *
+     * Null happens when neither field was filled in: an unconfigured user is
+     * safer than one silently given a department's access.
+     */
+    public function resolvedRole(): ?string
+    {
+        $department = $this->input('department') ?: null;
+        $designation = $this->input('designation') ?: null;
+
+        if ($department === null && $designation === null) {
+            return null;
+        }
+
+        return Designation::roleFor($department, $designation);
+    }
+
+    /**
+     * The manager derived from the department, since the form has no Manager
+     * field. Keeps the "team" data scope working.
+     */
+    public function resolvedManagerId(): ?int
+    {
+        $department = $this->input('department') ?: null;
+
+        if ($department === null) {
+            return null;
+        }
+
+        return Department::query()
+            ->where('name', $department)
+            ->first()
+            ?->managerUserId();
     }
 
     public function messages(): array
@@ -76,9 +130,22 @@ class StoreUserRequest extends FormRequest
             'password.required' => 'A password is required for a new user.',
             'password.min' => 'The password must be at least 8 characters.',
             'password.confirmed' => 'The two passwords do not match.',
-            'role.required' => 'Please choose a role.',
-            'role.in' => 'That role does not exist.',
-            'manager_id.exists' => 'The selected manager does not exist.',
+            'department.in' => 'That department does not exist.',
         ];
+    }
+
+    /**
+     * Every department name, active or not. A user may keep a department that
+     * was later deactivated, so validation must not filter on is_active.
+     *
+     * @return list<string>
+     */
+    private function departmentNames(): array
+    {
+        try {
+            return Department::allNames();
+        } catch (\Throwable) {
+            return array_keys(Rbac::EMPLOYEE_ROLES);
+        }
     }
 }

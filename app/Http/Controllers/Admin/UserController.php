@@ -8,6 +8,7 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Department;
 use App\Models\User;
+use App\Rbac\Designation;
 use App\Services\UserManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -84,12 +85,23 @@ class UserController extends Controller
             'email' => $data['email'],
             'password' => $data['password'], // hashed by the model cast
             'department' => $data['department'] ?? null,
-            'manager_id' => $data['manager_id'] ?? null,
+            'designation' => $data['designation'] ?? null,
+            // Derived from the department: the form has no Manager field.
+            'manager_id' => $request->resolvedManagerId(),
             'is_active' => $request->boolean('is_active', true),
         ]);
 
-        // Role goes through the single sync wrapper, never users.role directly.
-        $this->users->assignRole($user, $data['role']);
+        /*
+         * The role is derived from (department, designation) by the request,
+         * never taken from the browser. A user with neither field filled in is
+         * created with no role, which means no access until an admin sets it.
+         */
+        $role = $request->resolvedRole();
+
+        if ($role !== null) {
+            // Role goes through the single sync wrapper, never users.role directly.
+            $this->users->assignRole($user, $role);
+        }
 
         return redirect()->route('admin.users.index')
             ->with('success', "User {$user->name} created successfully.");
@@ -118,7 +130,9 @@ class UserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'department' => $data['department'] ?? null,
-            'manager_id' => $data['manager_id'] ?? null,
+            'designation' => $data['designation'] ?? null,
+            // Derived from the department: the form has no Manager field.
+            'manager_id' => $request->resolvedManagerId(),
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -132,10 +146,13 @@ class UserController extends Controller
 
         $user->save();
 
-        // Role always goes through the wrapper, which keeps users.role in sync.
-        // Comparing against the pre-update value avoids a pointless write.
-        if ($previousRole !== $data['role']) {
-            $this->users->assignRole($user, $data['role']);
+        // Role is derived from (department, designation), and always goes
+        // through the wrapper, which keeps users.role in sync. Comparing
+        // against the pre-update value avoids a pointless write.
+        $newRole = $request->resolvedRole();
+
+        if ($newRole !== null && $previousRole !== $newRole) {
+            $this->users->assignRole($user, $newRole);
         }
 
         // Deactivating must also end any active session.
@@ -200,16 +217,18 @@ class UserController extends Controller
 
     /**
      * Shared select options for the create and edit forms.
+     *
+     * There is deliberately no roles or managers here: the form has no Role
+     * field and no Manager field. Designations arrive as one map keyed by
+     * department so the form can narrow the list without another request.
      */
     private function formOptions(?User $user): array
     {
         return [
             'user' => $user,
-            'roles' => Role::orderBy('name')->get(),
-            // Same eligibility rule as the Departments page, so a user who can
-            // be a department manager can also be a direct manager.
-            'managers' => Department::managerCandidates($user?->id),
             'departments' => Department::names(),
+            'designations' => Designation::map(),
+            'defaultDesignations' => Designation::forDepartment(null),
         ];
     }
 }

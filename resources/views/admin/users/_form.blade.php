@@ -1,9 +1,15 @@
 {{--
  | Shared create/edit form fields for a user.
- | $user   : null on create, the User model on edit
- | $roles  : Spatie roles for the dropdown
- | $managers: eligible managers (admins + managers, excluding self)
- | $departments : allowed department values
+ |
+ | $user               : null on create, the User model on edit
+ | $departments        : department names for the dropdown
+ | $designations       : department name => [slug => label], drives the
+ |                       dependent dropdown without a second request
+ | $defaultDesignations: the list shown before a department is chosen
+ |
+ | There is deliberately no Role field and no Manager field. Access is derived
+ | from (department, designation) by App\Rbac\Designation, and the manager comes
+ | from the department. Both are decided in the request, never in the browser.
  --}}
 
 @if ($errors->any())
@@ -52,21 +58,31 @@
             class="shadow-sm appearance-none border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
     </div>
 
-    {{-- Role --}}
+    {{-- Designation. Options depend on the department chosen below. --}}
     <div>
-        <label for="role" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
-            Role *</label>
-        <select name="role" id="role" required
+        <label for="designation"
+            class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
+            Designation</label>
+        <select name="designation" id="designation"
+            data-default-options='@json($defaultDesignations)'
             class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-            <option value="">Choose a role</option>
-            @foreach ($roles as $role)
-                <option value="{{ $role->name }}"
-                    {{ old('role', $user?->getRoleNames()->first()) === $role->name ? 'selected' : '' }}>
-                    {{ ucfirst($role->name) }}</option>
+            <option value="">None</option>
+            {{-- Rendered server-side so the correct list is present before any
+                 JavaScript runs; the script below takes over on change. --}}
+            @php
+                $initialDesignations = $user?->department
+                    ? ($designations[$user->department] ?? $defaultDesignations)
+                    : $defaultDesignations;
+                $selectedDesignation = old('designation', $user?->designation);
+            @endphp
+            @foreach ($initialDesignations as $slug => $label)
+                <option value="{{ $slug }}" {{ $selectedDesignation === $slug ? 'selected' : '' }}>
+                    {{ $label }}
+                </option>
             @endforeach
         </select>
         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            Admin always has full access. Other roles take effect as soon as permissions are set.
+            The options change with the department.
         </p>
     </div>
 
@@ -78,40 +94,21 @@
             class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
             <option value="">None</option>
             @foreach ($departments as $department)
-                <option value="{{ $department }}" {{ old('department', $user?->department) === $department ? 'selected' : '' }}>
-                    {{ ucfirst($department) }}</option>
+                <option value="{{ $department }}"
+                    {{ old('department', $user?->department) === $department ? 'selected' : '' }}>
+                    {{ ucfirst($department) }}
+                </option>
             @endforeach
         </select>
         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            Required for sales, marketing, development and hr. Not used by admin or manager.
+            Decides what the user can reach, so leave it blank only for an
+            account you have not configured yet.
         </p>
     </div>
-
-    {{-- Manager --}}
-    <div>
-        <label for="manager_id" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
-            Manager</label>
-        <select name="manager_id" id="manager_id"
-            class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-            <option value="">No manager</option>
-            @foreach ($managers as $manager)
-                <option value="{{ $manager->id }}" {{ (int) old('manager_id', $user?->manager_id) === $manager->id ? 'selected' : '' }}>
-                    {{ $manager->name }}</option>
-            @endforeach
-        </select>
-    </div>
-
-    {{-- Active toggle --}}
-    <div class="flex items-end pb-2">
-        <label for="is_active" class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-            <input type="hidden" name="is_active" value="0">
-            <input type="checkbox" name="is_active" id="is_active" value="1"
-                @checked(old('is_active', $user?->is_active ?? true))
-                class="rounded border-gray-300 dark:border-gray-600 text-gray-500 focus:ring-gray-500">
-            <span class="font-semibold">Account is active</span>
-        </label>
-    </div>
 </div>
+
+{{-- is_active is intentionally not a form field. New users are active, and
+     deactivation happens from the Users list, which also ends their session. --}}
 
 <div class="flex gap-3">
     <button type="submit"
@@ -123,3 +120,49 @@
         Cancel
     </a>
 </div>
+
+<script>
+    /*
+     | Dependent Designation dropdown.
+     |
+     | The whole map ships with the page, so changing department re-renders the
+     | designation list instantly with no request. A designation that is no
+     | longer offered is cleared, so a stale value cannot be submitted.
+     */
+    (function() {
+        var designationsByDepartment = @json($designations);
+        var designationSelect = document.getElementById('designation');
+        var departmentSelect = document.getElementById('department');
+
+        if (!designationSelect || !departmentSelect) return;
+
+        var defaultOptions = JSON.parse(designationSelect.dataset.defaultOptions || '{}');
+
+        function refresh(keepCurrent) {
+            var department = departmentSelect.value;
+            var options = designationsByDepartment[department] || defaultOptions;
+
+            var current = keepCurrent ? designationSelect.value : '';
+            designationSelect.innerHTML = '';
+
+            var none = document.createElement('option');
+            none.value = '';
+            none.textContent = 'None';
+            designationSelect.appendChild(none);
+
+            Object.keys(options).forEach(function(slug) {
+                var option = document.createElement('option');
+                option.value = slug;
+                option.textContent = options[slug];
+                designationSelect.appendChild(option);
+            });
+
+            // Only keep the old value when it is still on offer.
+            designationSelect.value = Object.prototype.hasOwnProperty.call(options, current) ? current : '';
+        }
+
+        departmentSelect.addEventListener('change', function() {
+            refresh(false);
+        });
+    })();
+</script>
