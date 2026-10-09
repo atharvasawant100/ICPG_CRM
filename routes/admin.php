@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
@@ -16,10 +17,11 @@ use Illuminate\Support\Facades\Route;
 | behind the same session handling as the rest of the app.
 |
 | Permissions:
-|   /admin/users       users.view, users.create, users.edit
-|   /admin/roles       roles.view, roles.edit
-|   /admin/audit-logs  audit_logs.view
-|   /admin/settings    settings.view
+|   /admin/users        users.view, users.create, users.edit
+|   /admin/departments  departments.view, departments.create, departments.edit
+|   /admin/roles        roles.view, roles.edit
+|   /admin/audit-logs   audit_logs.view
+|   /admin/settings     settings.view
 |
 | Every mutating action is additionally re-checked inside the controller, so
 | hiding a button is never the only thing standing between a user and a change.
@@ -47,6 +49,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
         ->middleware('permission:users.edit')->name('users.toggle');
     Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword'])
         ->middleware('permission:users.edit')->name('users.reset-password');
+
+    // ---- Departments -------------------------------------------------------
+    // No delete route: users.department stores the department name as a string,
+    // so removing a row would strand its users with a department that no
+    // longer exists. Deactivate instead, which is reversible.
+    Route::get('departments', [DepartmentController::class, 'index'])
+        ->middleware('permission:departments.view')->name('departments.index');
+    Route::post('departments', [DepartmentController::class, 'store'])
+        ->middleware('permission:departments.create')->name('departments.store');
+    Route::match(['put', 'patch'], 'departments/{department}', [DepartmentController::class, 'update'])
+        ->middleware('permission:departments.edit')->name('departments.update');
 
     // ---- Roles and permissions ---------------------------------------------
     Route::get('roles', [RoleController::class, 'index'])

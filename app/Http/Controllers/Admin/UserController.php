@@ -6,8 +6,8 @@ use App\Http\Controllers\Admin\Concerns\AuthorizesByPermission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\Department;
 use App\Models\User;
-use App\Rbac\Rbac;
 use App\Services\UserManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -55,7 +55,8 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'roles' => $roles,
-            'departments' => ['sales', 'marketing', 'development', 'hr'],
+            // Includes inactive departments so the filter can still find them.
+            'departments' => Department::names(activeOnly: false),
         ]);
     }
 
@@ -202,22 +203,13 @@ class UserController extends Controller
      */
     private function formOptions(?User $user): array
     {
-        // Managers are admins, plus anyone whose role can have reports.
-        $managers = User::query()
-            ->active()
-            ->where(function ($q) use ($user) {
-                $q->whereHas('roles', fn ($r) => $r->where('name', Rbac::ADMIN_ROLE))
-                    ->orWhereHas('roles', fn ($r) => $r->where('name', 'manager'));
-            })
-            ->when($user, fn ($q) => $q->whereKeyNot($user->id))
-            ->orderBy('name')
-            ->get();
-
         return [
             'user' => $user,
             'roles' => Role::orderBy('name')->get(),
-            'managers' => $managers,
-            'departments' => ['sales', 'marketing', 'development', 'hr'],
+            // Same eligibility rule as the Departments page, so a user who can
+            // be a department manager can also be a direct manager.
+            'managers' => Department::managerCandidates($user?->id),
+            'departments' => Department::names(),
         ];
     }
 }

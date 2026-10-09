@@ -68,6 +68,9 @@ final class Rbac
         'recurring_invoices' => ['view', 'create', 'edit', 'delete', 'export', 'toggle'],
         'followups'          => ['view', 'create', 'edit', 'delete'],
         'users'              => ['view', 'create', 'edit', 'delete'],
+        // Departments: list, add, and change the manager. No delete, because
+        // users.department stores the department name as a string.
+        'departments'        => ['view', 'create', 'edit'],
         'settings'           => ['view'],
         'audit_logs'         => ['view'],
     ];

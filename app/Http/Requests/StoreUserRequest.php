@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidatesUserDepartment;
 use App\Models\User;
 use App\Rbac\Rbac;
 use App\Services\UserManagementService;
@@ -16,6 +17,7 @@ use Illuminate\Validation\Rule;
  */
 class StoreUserRequest extends FormRequest
 {
+    use ValidatesUserDepartment;
     public function authorize(): bool
     {
         return $this->user()?->can('users.create') ?? false;
@@ -33,7 +35,7 @@ class StoreUserRequest extends FormRequest
             ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', Rule::in(Rbac::ROLES)],
-            'department' => ['nullable', 'string', Rule::in(['sales', 'marketing', 'development', 'hr'])],
+            'department' => $this->departmentRules(),
             'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -47,24 +49,9 @@ class StoreUserRequest extends FormRequest
             $department = $this->input('department');
             $managerId = $this->input('manager_id');
 
-            // Rule 4: department required for the employee departments, optional
+            // Rule 4: department required for employee departments, optional
             // for admin and manager.
-            $requiresDepartment = ! in_array($role, [Rbac::ADMIN_ROLE, 'manager'], true);
-
-            if ($requiresDepartment && blank($department)) {
-                $validator->errors()->add(
-                    'department',
-                    'A department is required for the '.str_replace('_', ' ', (string) $role).' role.'
-                );
-            }
-
-            if (in_array($department, ['sales', 'marketing', 'development', 'hr'], true)
-                && in_array($role, [Rbac::ADMIN_ROLE, 'manager'], true)) {
-                $validator->errors()->add(
-                    'department',
-                    'Admin and manager roles do not use a department. Leave it unset.'
-                );
-            }
+            $this->applyDepartmentRules($validator, $role, $department);
 
             // Rule 3: no self-management, no loops.
             if ($managerId !== null && (int) $managerId === (int) optional($this->user())->id) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidatesUserDepartment;
 use App\Models\User;
 use App\Rbac\Rbac;
 use App\Services\UserManagementService;
@@ -16,6 +17,8 @@ use Illuminate\Validation\Validator;
  */
 class UpdateUserRequest extends FormRequest
 {
+    use ValidatesUserDepartment;
+
     public function authorize(): bool
     {
         return $this->user()?->can('users.edit') ?? false;
@@ -34,7 +37,7 @@ class UpdateUserRequest extends FormRequest
             // Optional on edit: leave blank to keep the current password.
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', Rule::in(Rbac::ROLES)],
-            'department' => ['nullable', 'string', Rule::in(['sales', 'marketing', 'development', 'hr'])],
+            'department' => $this->departmentRules(),
             'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -75,22 +78,7 @@ class UpdateUserRequest extends FormRequest
             }
 
             // Rule 4: department required for employee departments.
-            $requiresDepartment = ! in_array($newRole, [Rbac::ADMIN_ROLE, 'manager'], true);
-
-            if ($requiresDepartment && blank($this->input('department'))) {
-                $validator->errors()->add(
-                    'department',
-                    'A department is required for the '.str_replace('_', ' ', $newRole).' role.'
-                );
-            }
-
-            if (in_array($this->input('department'), ['sales', 'marketing', 'development', 'hr'], true)
-                && in_array($newRole, [Rbac::ADMIN_ROLE, 'manager'], true)) {
-                $validator->errors()->add(
-                    'department',
-                    'Admin and manager roles do not use a department. Leave it unset.'
-                );
-            }
+            $this->applyDepartmentRules($validator, $newRole, $this->input('department'));
 
             // Rule 3: self-management and reporting loops.
             $managerId = $this->input('manager_id');

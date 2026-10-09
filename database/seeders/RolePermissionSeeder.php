@@ -31,10 +31,21 @@ class RolePermissionSeeder extends Seeder
      */
     public const ADMIN_EMAILS = ['admin@iconicpages.com'];
 
+    /**
+     * The departments that existed before this table did.
+     *
+     * users.department already holds these values, so they must exist as rows
+     * for the existing users to keep matching a department.
+     *
+     * @var list<string>
+     */
+    public const DEFAULT_DEPARTMENTS = ['sales', 'marketing', 'development', 'hr'];
+
     public function run(): void
     {
         $this->seedPermissions();
         $this->seedRoles();
+        $this->seedDepartments();
         $this->seedDataScopes();
         $this->assignAdminRoles();
         $this->flushCache();
@@ -76,6 +87,28 @@ class RolePermissionSeeder extends Seeder
         }
 
         $this->command?->info('Roles: '.implode(', ', Rbac::ROLES));
+    }
+
+    /**
+     * Create the original departments.
+     *
+     * Idempotent, and never overwrites an existing row: a manager an admin has
+     * already assigned must survive a re-seed.
+     */
+    protected function seedDepartments(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('departments')) {
+            return;
+        }
+
+        foreach (self::DEFAULT_DEPARTMENTS as $name) {
+            \App\Models\Department::firstOrCreate(['name' => $name]);
+        }
+
+        $this->command?->info(sprintf(
+            'Departments: %d row(s) in the departments table.',
+            \App\Models\Department::count()
+        ));
     }
 
     /**
