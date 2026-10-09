@@ -4,7 +4,7 @@
 @section('page-title', 'Departments')
 
 @section('content')
-    <div class="mb-4 sm:mb-5 md:mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div class="mb-4 sm:mb-5 md:mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
             <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Departments</h2>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -32,14 +32,16 @@
 
     {{-- A manager is required, so say it plainly when there is nobody to pick.
          Without this the dropdown would be empty and the page unusable. --}}
-    @if ($managers->isEmpty())
-        <div
-            class="mb-4 sm:mb-5 bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-500 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg text-sm">
-            No active user holds the admin or manager role, so there is nobody to assign as a
-            department manager. Create or promote one on the
-            <a href="{{ route('admin.users.index') }}" class="underline font-semibold">Users</a> page first.
-        </div>
-    @endif
+    @can('departments.create')
+        @if ($managers->isEmpty())
+            <div
+                class="mb-4 sm:mb-5 bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-500 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg text-sm">
+                No active user holds the admin or manager role, so there is nobody to assign as a
+                department manager. Create or promote one on the
+                <a href="{{ route('admin.users.index') }}" class="underline font-semibold">Users</a> page first.
+            </div>
+        @endif
+    @endcan
 
     {{-- Add form, revealed by the button above. --}}
     @can('departments.create')
@@ -120,14 +122,15 @@
         </div>
     @endcan
 
-    {{-- List --}}
+    {{-- List. No Manager column and no inline controls: the row links to a
+         detail page for the team and an edit page for the settings. --}}
     <div
         class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700">
         <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        @foreach (['Department', 'Description', 'Users', 'Status', 'Manager'] as $heading)
+                        @foreach (['Department', 'Description', 'Members', 'Status', 'Actions'] as $heading)
                             <th
                                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 {{ $heading }}</th>
@@ -137,14 +140,20 @@
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     @forelse ($departments as $department)
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="font-semibold text-gray-800 dark:text-white">
+                            <td class="px-6 py-4">
+                                <a href="{{ route('admin.departments.show', $department) }}"
+                                    class="font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                     {{ ucfirst($department->name) }}
-                                </span>
+                                </a>
+                                @unless ($department->manager_id)
+                                    <span
+                                        class="ml-2 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] font-bold uppercase">
+                                        No manager</span>
+                                @endunless
                             </td>
 
                             <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                {{ $department->description ?: '-' }}
+                                {{ $department->description ?: '—' }}
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -152,63 +161,28 @@
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
-                                @if ($department->is_active)
-                                    <span
-                                        class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        Active</span>
-                                @else
-                                    <span
-                                        class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                        Inactive</span>
-                                @endif
+                                @include('admin.departments._status', ['department' => $department])
                             </td>
 
-                            <td class="px-6 py-4">
-                                @can('departments.edit')
-                                    {{-- The manager list stays visible, so changing the
-                                         manager needs no separate page. --}}
-                                    <form action="{{ route('admin.departments.update', $department) }}"
-                                        method="POST" class="flex items-center gap-2">
-                                        @csrf
-                                        @method('PUT')
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.departments.show', $department) }}"
+                                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        View
+                                    </a>
 
-                                        <select name="manager_id" required
-                                            class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-                                            {{-- Keep the current manager selectable even if
-                                                 they no longer meet the eligibility rule,
-                                                 so saving does not silently swap them. --}}
-                                            @if ($department->manager && ! $managers->contains($department->manager))
-                                                <option value="{{ $department->manager->id }}" selected>
-                                                    {{ $department->manager->name }} — {{ $department->manager->email }}
-                                                </option>
-                                            @elseif (! $department->manager_id)
-                                                {{-- The four pre-existing departments have no
-                                                     manager yet until one is picked. --}}
-                                                <option value="" disabled selected>Choose a manager</option>
-                                            @endif
-                                            @foreach ($managers as $manager)
-                                                <option value="{{ $manager->id }}"
-                                                    {{ $department->manager_id === $manager->id ? 'selected' : '' }}>
-                                                    {{ $manager->name }} — {{ $manager->email }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-
-                                        <button type="submit"
-                                            class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">
-                                            Save
-                                        </button>
-                                    </form>
-                                @else
-                                    <span class="text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $department->manager?->name ?? 'Not set' }}
-                                    </span>
-                                @endcan
+                                    @can('departments.edit')
+                                        <a href="{{ route('admin.departments.edit', $department) }}"
+                                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-900/60 transition-colors">
+                                            Edit
+                                        </a>
+                                    @endcan
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                 No departments yet.
                             </td>
                         </tr>
@@ -222,18 +196,9 @@
             @forelse ($departments as $department)
                 <div class="p-4">
                     <div class="flex items-start justify-between gap-2 mb-1">
-                        <span class="font-semibold text-gray-800 dark:text-white">
-                            {{ ucfirst($department->name) }}
-                        </span>
-                        @if ($department->is_active)
-                            <span
-                                class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 flex-shrink-0">
-                                Active</span>
-                        @else
-                            <span
-                                class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 flex-shrink-0">
-                                Inactive</span>
-                        @endif
+                        <a href="{{ route('admin.departments.show', $department) }}"
+                            class="font-semibold text-gray-800 dark:text-white">{{ ucfirst($department->name) }}</a>
+                        @include('admin.departments._status', ['department' => $department])
                     </div>
 
                     @if ($department->description)
@@ -241,41 +206,21 @@
                             {{ $department->description }}</p>
                     @endif
 
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        {{ $department->users_count }} user(s)</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        {{ $department->users_count }} member(s)</p>
 
-                    @can('departments.edit')
-                        <form action="{{ route('admin.departments.update', $department) }}" method="POST">
-                            @csrf
-                            @method('PUT')
-                            <div class="flex items-center gap-2">
-                                <select name="manager_id" required
-                                    class="flex-1 shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-                                    @if ($department->manager && ! $managers->contains($department->manager))
-                                        <option value="{{ $department->manager->id }}" selected>
-                                            {{ $department->manager->name }} — {{ $department->manager->email }}
-                                        </option>
-                                    @elseif (! $department->manager_id)
-                                        <option value="" disabled selected>Choose a manager</option>
-                                    @endif
-                                    @foreach ($managers as $manager)
-                                        <option value="{{ $manager->id }}"
-                                            {{ $department->manager_id === $manager->id ? 'selected' : '' }}>
-                                            {{ $manager->name }} — {{ $manager->email }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <button type="submit"
-                                    class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 transition-colors">
-                                    Save
-                                </button>
-                            </div>
-                        </form>
-                    @else
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Manager: {{ $department->manager?->name ?? 'not set' }}
-                        </p>
-                    @endcan
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('admin.departments.show', $department) }}"
+                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                            View
+                        </a>
+                        @can('departments.edit')
+                            <a href="{{ route('admin.departments.edit', $department) }}"
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                                Edit
+                            </a>
+                        @endcan
+                    </div>
                 </div>
             @empty
                 <p class="text-center text-gray-500 dark:text-gray-400 py-8">No departments yet.</p>

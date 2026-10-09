@@ -47,6 +47,18 @@ class Department extends Model
     ];
 
     /**
+     * Bind by name in the URL rather than by id.
+     *
+     * Departments are addressed by name everywhere in the UI ("/admin/
+     * departments/development"), and the name is the value users.department
+     * stores, so it is the key that means something to an admin.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'name';
+    }
+
+    /**
      * The user who manages this department.
      */
     public function manager(): BelongsTo

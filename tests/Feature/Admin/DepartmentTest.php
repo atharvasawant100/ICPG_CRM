@@ -103,7 +103,9 @@ class DepartmentTest extends RbacTestCase
             'manager_id' => $manager->id,
         ]);
 
-        $response->assertRedirect(route('admin.departments.index'));
+        $department = Department::where('name', 'finance')->firstOrFail();
+
+        $response->assertRedirect(route('admin.departments.show', $department));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('departments', [
@@ -119,7 +121,7 @@ class DepartmentTest extends RbacTestCase
         $this->actingAs($this->admin())->post(route('admin.departments.store'), [
             'name' => '  Finance   Team  ',
             'manager_id' => $manager->id,
-        ])->assertRedirect(route('admin.departments.index'));
+        ])->assertRedirect(route('admin.departments.show', Department::where('name', 'finance team')->firstOrFail()));
 
         $this->assertDatabaseHas('departments', ['name' => 'finance team']);
     }
@@ -184,35 +186,65 @@ class DepartmentTest extends RbacTestCase
     }
 
     /**
-     * The dropdowns must not offer "no manager", otherwise the UI would
-     * contradict the validation.
-     */
-    public function test_the_dropdowns_do_not_offer_a_no_manager_option(): void
+ * The manager dropdowns must not offer "no manager", otherwise the UI would
+ * contradict the validation.
+ */
+public function test_the_dropdowns_do_not_offer_a_no_manager_option(): void
     {
-        $html = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+        $manager = $this->managerCandidate('manager');
+        $department = Department::where('name', 'sales')->firstOrFail();
+        $department->update(['manager_id' => $manager->id]);
 
-        $this->assertStringNotContainsString('No manager', $html);
-        $this->assertStringNotContainsString('value="">No', $html);
+        // Create panel on the index, and the edit page.
+        $index = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+        $edit = $this->actingAs($this->admin())->get(route('admin.departments.edit', $department))->getContent();
 
-        // Every manager select carries the required attribute.
-        foreach ($this->managerSelects($html) as $select) {
+        $this->assertNotEmpty($this->managerSelects($index));
+        $this->assertNotEmpty($this->managerSelects($edit));
+
+        foreach (array_merge($this->managerSelects($index), $this->managerSelects($edit)) as $select) {
             $this->assertStringContainsString('required', $select);
+            $this->assertStringNotContainsString('>No manager', $select);
         }
     }
 
     /**
-     * A department seeded without a manager still shows a prompt to pick one,
-     * rather than silently showing the first person in the list.
+     * A department with no manager is flagged on the list, and the edit page
+     * does not silently pre-select the first person in the dropdown.
      */
-    public function test_a_department_with_no_manager_prompts_for_one(): void
+public function test_a_department_with_no_manager_is_flagged(): void
     {
-        $html = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+        $department = Department::where('name', 'hr')->firstOrFail();
 
-        // Department rows only, not the add form, which is the first select.
-        $rowSelects = $this->managerSelects(substr($html, strpos($html, '<tbody')));
+        $this->assertNull($department->manager_id);
 
-        $this->assertNotEmpty($rowSelects);
-        $this->assertStringContainsString('Choose a manager', $rowSelects[0]);
+        $response = $this->actingAs($this->admin())->get(route('admin.departments.index'));
+
+        $response->assertSuccessful();
+        $response->assertSee('No manager');
+    }
+
+    /**
+     * With a manager set, the edit page preselects them and offers no
+     * placeholder, so saving is a no-op rather than a reassignment.
+     */
+public function test_the_edit_page_preselects_the_current_manager(): void
+    {
+        $manager = $this->managerCandidate('manager');
+        $department = Department::where('name', 'sales')->firstOrFail();
+        $department->update(['manager_id' => $manager->id]);
+
+        $select = $this->managerSelects(
+            $this->actingAs($this->admin())->get(route('admin.departments.edit', $department))->getContent()
+        )[0];
+
+        $this->assertStringNotContainsString('Choose a manager', $select);
+
+        // Blade puts the attributes on their own lines, so allow whitespace.
+        $this->assertMatchesRegularExpression(
+            '/<option\s+value="'.$manager->id.'"\s+selected/',
+            $select
+        );
     }
 
     /**
@@ -227,7 +259,7 @@ class DepartmentTest extends RbacTestCase
 
         $this->actingAs($this->admin())
             ->put(route('admin.departments.update', $department), ['manager_id' => $manager->id])
-            ->assertRedirect(route('admin.departments.index'));
+            ->assertRedirect(route('admin.departments.show', $department));
 
         $this->assertSame($manager->id, $department->fresh()->manager_id);
     }
@@ -238,20 +270,42 @@ class DepartmentTest extends RbacTestCase
      */
     public function test_the_page_explains_when_there_is_nobody_to_choose_as_manager(): void
     {
-        // The only other admin-role user is the seeded account. Deactivating it
+        // The seeded admin is the only admin/manager user. Deactivating it
         // empties the candidate list.
         User::where('email', RolePermissionSeeder::ADMIN_EMAILS[0])
             ->update(['is_active' => false]);
 
-        // Act as a plain viewer: an active admin would itself be a candidate.
+        /*
+         | Someone who can create a department but is not themselves a manager
+         | candidate. An acting admin would always be a candidate, so the
+         | warning could never reach them.
+         */
+        $creator = $this->userWithPermissions(['departments.view', 'departments.create'], 'dept_creator');
+
+        $this->assertCount(0, Department::managerCandidates());
+
+        $response = $this->actingAs($creator)->get(route('admin.departments.index'));
+
+        $response->assertSuccessful();
+        $response->assertSee('No active user holds the admin or manager role');
+    }
+
+    /**
+     * The warning is only shown to someone who can create, because it is about
+     * the create form. A read-only visitor does not need it.
+     */
+public function test_the_empty_manager_warning_is_hidden_from_read_only_visitors(): void
+    {
+        User::where('email', RolePermissionSeeder::ADMIN_EMAILS[0])
+            ->update(['is_active' => false]);
+
         $viewer = $this->userWithPermissions(['departments.view'], 'dept_viewer');
 
         $this->assertCount(0, Department::managerCandidates());
 
-        $response = $this->actingAs($viewer)->get(route('admin.departments.index'));
-
-        $response->assertSuccessful();
-        $response->assertSee('No active user holds the admin or manager role');
+        $this->actingAs($viewer)
+            ->get(route('admin.departments.index'))
+            ->assertDontSee('No active user holds the admin or manager role');
     }
 
     /**
@@ -332,7 +386,7 @@ class DepartmentTest extends RbacTestCase
 
         $this->actingAs($this->admin())
             ->put(route('admin.departments.update', $department), ['manager_id' => $new->id])
-            ->assertRedirect(route('admin.departments.index'));
+            ->assertRedirect(route('admin.departments.show', $department));
 
         $this->assertSame($new->id, $department->fresh()->manager_id);
     }
@@ -355,7 +409,7 @@ class DepartmentTest extends RbacTestCase
         // Replacing it works.
         $this->actingAs($this->admin())
             ->put(route('admin.departments.update', $department), ['manager_id' => $replacement->id])
-            ->assertRedirect(route('admin.departments.index'));
+            ->assertRedirect(route('admin.departments.show', $department));
 
         $this->assertSame($replacement->id, $department->fresh()->manager_id);
     }
@@ -386,7 +440,7 @@ class DepartmentTest extends RbacTestCase
                 'manager_id' => $manager->id,
                 'is_active' => '0',
             ])
-            ->assertRedirect(route('admin.departments.index'));
+            ->assertRedirect(route('admin.departments.show', $department));
 
         $this->assertFalse($department->fresh()->is_active);
 
@@ -497,6 +551,163 @@ class DepartmentTest extends RbacTestCase
         $this->seed(\Database\Seeders\RolePermissionSeeder::class);
 
         $this->assertSame(1, Department::where('name', 'sales')->count());
+    }
+
+    // ---- Detail page: the team ----------------------------------------------
+
+public function test_the_detail_page_lists_the_department_team(): void
+    {
+        $manager = $this->managerCandidate('manager');
+        Department::where('name', 'sales')->update(['manager_id' => $manager->id]);
+
+        User::factory()->create([
+            'name' => 'Team Member',
+            'email' => 'member@example.com',
+            'department' => 'sales',
+            'designation' => 'intern',
+        ])->assignRbacRole('sales');
+
+        $response = $this->actingAs($this->admin())
+            ->get(route('admin.departments.show', Department::where('name', 'sales')->firstOrFail()));
+
+        $response->assertSuccessful();
+        $response->assertSee('Team');
+        $response->assertSee('Team Member');
+        $response->assertSee('member@example.com');
+        $response->assertSee('Intern');
+        $response->assertSee('Sales');
+    }
+
+    public function test_the_team_excludes_users_of_other_departments(): void
+    {
+        User::factory()->create([
+            'name' => 'Marketing Person',
+            'email' => 'marketer@example.com',
+            'department' => 'marketing',
+        ]);
+
+        $response = $this->actingAs($this->admin())
+            ->get(route('admin.departments.show', Department::where('name', 'sales')->firstOrFail()));
+
+        $response->assertSuccessful();
+        $response->assertDontSee('marketer@example.com');
+    }
+
+    public function test_the_team_counts_active_and_deactivated_members(): void
+    {
+        User::factory()->create(['department' => 'hr', 'is_active' => true]);
+        User::factory()->create(['department' => 'hr', 'is_active' => false]);
+
+        $response = $this->actingAs($this->admin())
+            ->get(route('admin.departments.show', Department::where('name', 'hr')->firstOrFail()));
+
+        $response->assertSuccessful();
+
+        // Blade breaks the sentence across lines, so assert the fragments.
+        $response->assertSee('1 active');
+        $response->assertSee('1 deactivated');
+    }
+
+    public function test_the_detail_page_says_when_there_is_no_team(): void
+    {
+        $response = $this->actingAs($this->admin())
+            ->get(route('admin.departments.show', Department::where('name', 'sales')->firstOrFail()));
+
+        $response->assertSuccessful();
+        $response->assertSee('Nobody is assigned to this');
+    }
+
+    public function test_the_detail_page_requires_the_view_permission(): void
+    {
+        $user = $this->userWithPermissions(['users.view'], 'no_departments');
+        $department = Department::where('name', 'sales')->firstOrFail();
+
+        $this->actingAs($user)->get(route('admin.departments.show', $department))->assertForbidden();
+    }
+
+    // ---- Edit page --------------------------------------------------------
+
+public function test_the_edit_page_shows_the_current_manager(): void
+    {
+        $manager = $this->managerCandidate('manager');
+        $department = Department::where('name', 'sales')->firstOrFail();
+        $department->update(['manager_id' => $manager->id]);
+
+        $response = $this->actingAs($this->admin())->get(route('admin.departments.edit', $department));
+
+        $response->assertSuccessful();
+        $response->assertSee($manager->email);
+    }
+
+    public function test_the_edit_page_requires_the_edit_permission(): void
+    {
+        $viewer = $this->userWithPermissions(['departments.view'], 'dept_viewer');
+        $department = Department::where('name', 'sales')->firstOrFail();
+
+        $this->actingAs($viewer)->get(route('admin.departments.edit', $department))->assertForbidden();
+    }
+
+    /**
+     * The index no longer carries a Manager column or inline dropdowns, which
+     * is what made it hard to read.
+     */
+    public function test_the_index_has_no_manager_column_or_inline_dropdown(): void
+    {
+        $manager = $this->managerCandidate('manager');
+        Department::where('name', 'sales')->update(['manager_id' => $manager->id]);
+
+        $html = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+
+        // Scoped to the table: the create panel legitimately offers this
+        // manager in its dropdown, which is not the removed column.
+        $table = substr($html, strpos($html, '<tbody'), strpos($html, '</tbody>') - strpos($html, '<tbody'));
+
+        $this->assertStringNotContainsString($manager->email, $table);
+        $this->assertStringNotContainsString('MANAGER</th>', strtoupper($table));
+        $this->assertStringNotContainsString('Save', $table);
+
+        // One dropdown on the page: the create form. No per-row selects.
+        $this->assertCount(1, $this->managerSelects($html));
+    }
+
+    public function test_the_index_links_to_view_and_edit_for_each_department(): void
+    {
+        $department = Department::where('name', 'sales')->firstOrFail();
+
+        $response = $this->actingAs($this->admin())->get(route('admin.departments.index'));
+
+        $response->assertSuccessful();
+        $response->assertSee(route('admin.departments.show', $department), false);
+        $response->assertSee(route('admin.departments.edit', $department), false);
+        $response->assertSee('View');
+        $response->assertSee('Edit');
+    }
+
+    public function test_the_index_hides_edit_without_the_edit_permission(): void
+    {
+        $viewer = $this->userWithPermissions(['departments.view'], 'dept_viewer');
+        $department = Department::where('name', 'sales')->firstOrFail();
+
+        $response = $this->actingAs($viewer)->get(route('admin.departments.index'));
+
+        $response->assertSuccessful();
+        $response->assertSee(route('admin.departments.show', $department), false);
+        $response->assertDontSee(route('admin.departments.edit', $department), false);
+    }
+
+    public function test_the_edit_page_does_not_allow_renaming(): void
+    {
+        $manager = $this->managerCandidate('manager');
+        $department = Department::where('name', 'sales')->firstOrFail();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.departments.update', $department), [
+                'name' => 'renamed',
+                'manager_id' => $manager->id,
+            ])
+            ->assertRedirect(route('admin.departments.show', $department));
+
+        $this->assertSame('sales', $department->fresh()->name);
     }
 
     // ---- Helpers ----------------------------------------------------------

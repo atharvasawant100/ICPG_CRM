@@ -54,10 +54,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // No delete route: users.department stores the department name as a string,
     // so removing a row would strand its users with a department that no
     // longer exists. Deactivate instead, which is reversible.
+    //
+    // show must be registered before the {department}/edit pair so "edit" is
+    // not swallowed as a department slug.
     Route::get('departments', [DepartmentController::class, 'index'])
         ->middleware('permission:departments.view')->name('departments.index');
     Route::post('departments', [DepartmentController::class, 'store'])
         ->middleware('permission:departments.create')->name('departments.store');
+    Route::get('departments/{department}', [DepartmentController::class, 'show'])
+        ->middleware('permission:departments.view')->name('departments.show');
+    Route::get('departments/{department}/edit', [DepartmentController::class, 'edit'])
+        ->middleware('permission:departments.edit')->name('departments.edit');
     Route::match(['put', 'patch'], 'departments/{department}', [DepartmentController::class, 'update'])
         ->middleware('permission:departments.edit')->name('departments.update');
 
