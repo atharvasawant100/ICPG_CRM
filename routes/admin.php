@@ -161,4 +161,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // ---- Settings (placeholder) --------------------------------------------
     Route::get('settings', [SettingsController::class, 'index'])
         ->middleware('permission:settings.view')->name('settings.index');
+
+    // ---- System Upgrade & Migrations (Admin Only) --------------------------
+    Route::get('system/run-migrations', function () {
+        if (! auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+
+        return response("<pre style='background:#1e293b;color:#10b981;padding:25px;border-radius:12px;font-family:monospace;font-size:14px;line-height:1.6;'><b>System Upgrade & Migrations Complete:</b>\n\n{$output}\n✅ Permissions cache flushed and synchronized successfully!\n\n<a href='/admin/roles' style='color:#38bdf8;text-decoration:underline;'>&larr; Return to Roles & Permissions</a></pre>");
+    })->name('system.migrate');
 });

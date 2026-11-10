@@ -107,6 +107,14 @@ class RoleController extends Controller
         // exist and the pivot insert fails its foreign key. Resolve fresh.
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
+        // Ensure every validated permission row exists in the database
+        foreach ($valid as $permName) {
+            \Spatie\Permission\Models\Permission::firstOrCreate([
+                'name' => $permName,
+                'guard_name' => Rbac::GUARD,
+            ]);
+        }
+
         $role->syncPermissions($valid);
 
         $this->saveScopes($request, $role->name);
