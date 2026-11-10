@@ -42,11 +42,83 @@ return [
                 ],
 
                 [
+                    'label' => 'Team',
+                    'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+                    'route' => 'team.index',
+                    'permission' => 'team.view',
+                    'active' => ['team.*'],
+                ],
+
+                [
+                    'label' => 'My Attendance',
+                    'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+                    'route' => 'my-attendance.index',
+                    'permission' => 'my_attendance.view',
+                    'active' => ['my-attendance.*'],
+                ],
+
+                [
+                    'label' => 'My Leaves',
+                    'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                    'route' => 'my-leaves.index',
+                    'permission' => 'my_leaves.view',
+                    'active' => ['my-leaves.*'],
+                ],
+
+                [
+                    'label' => 'My Expenses',
+                    'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+                    'route' => 'my-expenses.index',
+                    'permission' => 'my_expenses.view',
+                    'active' => ['my-expenses.*'],
+                ],
+
+                [
+                    'label' => 'Task Pool',
+                    'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+                    'route' => 'tasks.index',
+                    'permission' => 'tasks.view',
+                    'active' => ['tasks.*'],
+                ],
+
+                [
+                    'label' => 'Direct Admin Tickets',
+                    'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+                    'route' => 'tickets.index',
+                    'permission' => null,
+                    'active' => ['tickets.*'],
+                ],
+
+                [
+                    'label' => 'Performance Report',
+                    'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+                    'route' => 'reports.performance',
+                    'permission' => 'reports.performance',
+                    'active' => ['reports.performance'],
+                ],
+
+            ],
+        ],
+
+        // ---- Sales ----------------------------------------------------
+        [
+            'label' => 'Sales',
+            'items' => [
+
+                [
                     'label' => 'Customers',
                     'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
                     'route' => 'customers.index',
                     'permission' => 'customers.view',
                     'active' => ['customers.*'],
+                ],
+
+                [
+                    'label' => 'Sales Tracking',
+                    'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+                    'route' => 'sales-tracking.index',
+                    'permission' => 'sales_tracking.view',
+                    'active' => ['sales-tracking.*'],
                 ],
 
                 [
@@ -56,34 +128,106 @@ return [
                     'active' => ['leads.*'],
                     'children' => [
                         [
-                            'label' => 'Leads Dashboard',
-                            'route' => 'leads.dashboard',
-                            'permission' => 'leads.view',
-                            'active' => ['leads.dashboard'],
-                        ],
-                        [
-                            'label' => 'Add New Lead',
-                            'route' => 'leads.create',
-                            'permission' => 'leads.create',
-                            'active' => ['leads.create', 'leads.create.*'],
-                        ],
-                        [
-                            'label' => 'View all Leads',
+                            'label' => 'All Leads',
                             'url' => '/leads',
                             'permission' => 'leads.view',
                             'active' => ['leads.index'],
                         ],
                         [
-                            'label' => 'Follow-up Calendar',
-                            'route' => 'leads.calendar',
-                            'permission' => 'followups.view',
-                            'active' => ['leads.calendar'],
+                            'label' => 'Add New Lead',
+                            'route' => 'leads.create.manual',
+                            'permission' => 'leads.create',
+                            'active' => ['leads.create', 'leads.create.manual'],
+                        ],
+                        [
+                            'label' => 'Import Leads (Bulk)',
+                            'route' => 'leads.create.bulk',
+                            'permission' => 'leads.import',
+                            'active' => ['leads.create.bulk'],
                         ],
                         [
                             'label' => 'Trash Leads',
                             'route' => 'leads.trash',
-                            'permission' => 'leads.view',
+                            'permission' => 'leads.delete',
                             'active' => ['leads.trash'],
+                        ],
+                    ],
+                ],
+
+                [
+                    'label' => 'Follow-Up Calendar',
+                    'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+                    'route' => 'leads.calendar',
+                    'permission' => 'followups.view',
+                    'active' => ['leads.calendar'],
+                ],
+
+            ],
+        ],
+
+        // ---- Social Media & Marketing ---------------------------------
+        [
+            'label' => 'Social Media',
+            'items' => [
+                [
+                    'label' => 'Content Calendar',
+                    'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+                    'route' => 'content.calendar',
+                    'permission' => 'content.view',
+                    'active' => ['content.calendar*'],
+                ],
+                [
+                    'label' => 'Content Dashboard',
+                    'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+                    'route' => 'content.dashboard',
+                    'permission' => 'content.view',
+                    'active' => ['content.dashboard'],
+                ],
+                [
+                    'label' => 'Content Posts',
+                    'icon' => 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z',
+                    'route' => 'content.posts.index',
+                    'permission' => 'content.view',
+                    'active' => ['content.posts.*'],
+                ],
+                [
+                    'label' => 'Publishing Queue',
+                    'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                    'route' => 'content.queue',
+                    'permission' => 'content.publish',
+                    'active' => ['content.queue'],
+                ],
+                [
+                    'label' => 'Brands & Accounts',
+                    'icon' => 'M7 20l4-16m2 16l4-16M6 9h14M4 15h14',
+                    'route' => 'brands.index',
+                    'permission' => 'content.brands',
+                    'active' => ['brands.*'],
+                ],
+            ],
+        ],
+        [
+            'label' => 'Accounting',
+            'items' => [
+
+                [
+                    'label' => 'Invoices',
+                    'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                    'permission' => 'invoices.view',
+                    'active' => ['invoices.*', 'recurring-invoices.*'],
+                    'children' => [
+                        [
+                            'label' => 'All Invoices',
+                            'route' => 'invoices.index',
+                            'permission' => 'invoices.view',
+                            'active' => ['invoices.*'],
+                            'activeExclude' => ['recurring-invoices.*'],
+                        ],
+                        [
+                            'label' => 'Recurring Invoices',
+                            'route' => 'recurring-invoices.index',
+                            'permission' => 'recurring_invoices.view',
+                            'active' => ['recurring-invoices.*'],
                         ],
                     ],
                 ],
@@ -137,26 +281,13 @@ return [
                 ],
 
                 [
-                    'label' => 'Invoices',
-                    'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-                    'permission' => 'invoices.view',
-                    'active' => ['invoices.*', 'recurring-invoices.*'],
-                    'children' => [
-                        [
-                            'label' => 'All Invoices',
-                            'route' => 'invoices.index',
-                            'permission' => 'invoices.view',
-                            'active' => ['invoices.*'],
-                            'activeExclude' => ['recurring-invoices.*'],
-                        ],
-                        [
-                            'label' => 'Recurring Invoices',
-                            'route' => 'recurring-invoices.index',
-                            'permission' => 'recurring_invoices.view',
-                            'active' => ['recurring-invoices.*'],
-                        ],
-                    ],
+                    'label' => 'Costing Employees',
+                    'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+                    'route' => 'admin.reports.costing',
+                    'permission' => 'reports.costing',
+                    'active' => ['admin.reports.costing'],
                 ],
+
             ],
         ],
 
@@ -166,24 +297,31 @@ return [
             'items' => [
 
                 [
-                    'label' => 'Users & Roles',
+                    'label' => 'Roles & Permissions',
+                    'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+                    'route' => 'admin.roles.index',
+                    'permission' => 'roles.view',
+                    'active' => ['admin.roles.*'],
+                ],
+
+                [
+                    'label' => 'Users',
                     'icon' => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
                     'route' => 'admin.users.index',
                     'permission' => 'users.view',
                     'active' => ['admin.users.*'],
-                    'badge' => true,
                     'children' => [
                         [
-                            'label' => 'Users',
+                            'label' => 'All Users',
                             'route' => 'admin.users.index',
                             'permission' => 'users.view',
-                            'active' => ['admin.users.index', 'admin.users.create', 'admin.users.edit'],
+                            'active' => ['admin.users.index', 'admin.users.edit'],
                         ],
                         [
-                            'label' => 'Roles & Permissions',
-                            'route' => 'admin.roles.index',
-                            'permission' => 'roles.view',
-                            'active' => ['admin.roles.*'],
+                            'label' => 'Add User',
+                            'route' => 'admin.users.create',
+                            'permission' => 'users.create',
+                            'active' => ['admin.users.create'],
                         ],
                     ],
                 ],
@@ -194,7 +332,105 @@ return [
                     'route' => 'admin.departments.index',
                     'permission' => 'departments.view',
                     'active' => ['admin.departments.*'],
-                    'badge' => true,
+                ],
+
+                [
+                    'label' => 'Attendance',
+                    'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+                    'permission' => 'attendance.view',
+                    'active' => ['admin.attendance.*'],
+                    'children' => [
+                        [
+                            'label' => 'Daily Sheet',
+                            'route' => 'admin.attendance.index',
+                            'permission' => 'attendance.view',
+                            'active' => ['admin.attendance.index', 'admin.attendance.edit'],
+                        ],
+                        [
+                            'label' => 'Mark Attendance',
+                            'route' => 'admin.attendance.create',
+                            'permission' => 'attendance.create',
+                            'active' => ['admin.attendance.create'],
+                        ],
+                        [
+                            'label' => 'Monthly Summary',
+                            'route' => 'admin.attendance.monthly',
+                            'permission' => 'attendance.view',
+                            'active' => ['admin.attendance.monthly'],
+                        ],
+                        [
+                            'label' => 'Timing Settings',
+                            'route' => 'admin.attendance.settings',
+                            'permission' => 'attendance.create',
+                            'active' => ['admin.attendance.settings'],
+                        ],
+                    ],
+                ],
+
+                [
+                    'label' => 'Leave Management',
+                    'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                    'permission' => 'leaves.view',
+                    'active' => ['admin.leaves.*'],
+                    'children' => [
+                        [
+                            'label' => 'Leave Requests',
+                            'route' => 'admin.leaves.index',
+                            'permission' => 'leaves.view',
+                            'active' => ['admin.leaves.index', 'admin.leaves.edit'],
+                        ],
+                        [
+                            'label' => 'Record Leave',
+                            'route' => 'admin.leaves.create',
+                            'permission' => 'leaves.create',
+                            'active' => ['admin.leaves.create'],
+                        ],
+                        [
+                            'label' => 'Leave Balances',
+                            'route' => 'admin.leaves.balances',
+                            'permission' => 'leaves.view',
+                            'active' => ['admin.leaves.balances'],
+                        ],
+                        [
+                            'label' => 'Leave Types',
+                            'route' => 'admin.leaves.types',
+                            'permission' => 'leaves.settings',
+                            'active' => ['admin.leaves.types'],
+                        ],
+                        [
+                            'label' => 'Company Holidays',
+                            'route' => 'admin.holidays.index',
+                            'permission' => 'holidays.view',
+                            'active' => ['admin.holidays.*'],
+                        ],
+                    ],
+                ],
+
+                [
+                    'label' => 'Payroll',
+                    'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+                    'permission' => 'payroll.view',
+                    'active' => ['payrolls.*', 'employee-salaries.*'],
+                    'children' => [
+                        [
+                            'label' => 'All Payrolls',
+                            'route' => 'payrolls.index',
+                            'permission' => 'payroll.view',
+                            'active' => ['payrolls.index', 'payrolls.show', 'payrolls.edit'],
+                        ],
+                        [
+                            'label' => 'Generate Payroll',
+                            'route' => 'payrolls.create',
+                            'permission' => 'payroll.create',
+                            'active' => ['payrolls.create'],
+                        ],
+                        [
+                            'label' => 'Salary Settings',
+                            'route' => 'employee-salaries.index',
+                            'permission' => 'payroll.view',
+                            'active' => ['employee-salaries.*'],
+                        ],
+                    ],
                 ],
 
                 [
@@ -203,7 +439,6 @@ return [
                     'route' => 'admin.audit-logs.index',
                     'permission' => 'audit_logs.view',
                     'active' => ['admin.audit-logs.*'],
-                    'badge' => true,
                 ],
 
                 [

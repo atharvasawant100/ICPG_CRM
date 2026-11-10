@@ -4,111 +4,197 @@
 @section('page-title', 'Edit Department')
 
 @section('content')
-    <div class="mb-4 sm:mb-5 md:mb-6">
-        <a href="{{ route('admin.departments.index') }}"
-            class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-3">
-            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Departments
-        </a>
-        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
-            Edit {{ ucfirst($department->name) }}
-        </h2>
-    </div>
+<div class="w-full">
 
-    @if ($errors->any())
-        <div
-            class="mb-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg">
-            <ul class="list-disc list-inside space-y-0.5 text-sm">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
+    <!-- Single Full-Width Card Container matching Standard Form UI -->
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-700 p-6 sm:p-8 md:p-10 transition-colors duration-200">
+
+        <!-- Header Inside the Container with Breadcrumbs -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-gray-100 dark:border-gray-700/80">
+            <div>
+                <div class="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    <a href="{{ route('admin.departments.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Departments</a>
+                    <span>/</span>
+                    <a href="{{ route('admin.departments.show', $department) }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{{ ucfirst($department->name) }}</a>
+                    <span>/</span>
+                    <span class="text-blue-600 dark:text-blue-400 font-semibold">Edit</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Edit Department: {{ ucfirst($department->name) }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Update department manager, designations, and configuration.
+                </p>
+            </div>
+
+            <a href="{{ route('admin.departments.show', $department) }}"
+                class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 transition-colors self-start sm:self-auto">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View Department
+            </a>
         </div>
-    @endif
 
-    <div
-        class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-5 md:p-6 border border-gray-100 dark:border-gray-700 max-w-4xl">
-        <form method="POST" action="{{ route('admin.departments.update', $department) }}">
+        {{-- Validation Errors --}}
+        @if ($errors->any())
+            <div class="mb-8 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 rounded-xl p-4">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-bold text-red-800 dark:text-red-200">Please correct the following errors:</h3>
+                        <ul class="text-xs text-red-700 dark:text-red-300 list-disc list-inside space-y-0.5">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- Form Elements -->
+        <form method="POST" action="{{ route('admin.departments.update', $department) }}" class="space-y-7">
             @csrf
             @method('PUT')
 
-            {{-- Name is shown but not editable: users.department stores it as a
-                 string, so renaming would strand every member. --}}
-            <div class="mb-5">
-                <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
-                    Department name</label>
-                <div
-                    class="px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">
-                    {{ ucfirst($department->name) }}
+            <!-- 2-Column Responsive Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {{-- Department Name (read-only) --}}
+                <div>
+                    <label class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Department Name
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                        <div class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 text-sm font-medium">
+                            {{ ucfirst($department->name) }}
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                        The department name is locked because employee assignments depend on it.
+                    </p>
                 </div>
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    The name cannot be changed: users store it, so renaming would orphan them.
-                </p>
+
+                {{-- Manager Dropdown --}}
+                <div>
+                    <label for="manager_id" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Department Manager <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <select name="manager_id" id="manager_id" required
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-pointer @error('manager_id') border-red-500 @enderror">
+                            @if ($department->manager && ! $managers->contains($department->manager))
+                                <option value="{{ $department->manager->id }}" selected>
+                                    {{ $department->manager->name }} ({{ $department->manager->email }})
+                                </option>
+                            @endif
+                            @foreach ($managers as $manager)
+                                <option value="{{ $manager->id }}"
+                                    {{ (int) old('manager_id', $department->manager_id) === $manager->id ? 'selected' : '' }}>
+                                    {{ $manager->name }} ({{ $manager->email }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                        Active users holding the Admin or Manager role. All department members report here.
+                    </p>
+                </div>
+
+                {{-- Description --}}
+                <div class="md:col-span-2">
+                    <label for="description" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Description
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+                            </svg>
+                        </div>
+                        <input type="text" name="description" id="description" maxlength="255"
+                            placeholder="What this department does"
+                            value="{{ old('description', $department->description) }}"
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400">
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">Brief summary of department responsibilities and functions</p>
+                </div>
+
+                {{-- Designations (Job Titles) --}}
+                <div class="md:col-span-2 bg-gray-50 dark:bg-gray-900/40 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="designations" class="block text-sm font-bold text-gray-800 dark:text-gray-200">
+                            Designations (Job Titles)
+                        </label>
+                        <span class="text-[11px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                            Role Automated
+                        </span>
+                    </div>
+                    @php
+                        $currentDesignations = $department->parsedDesignations();
+                        $designationsStr = implode(', ', array_values($currentDesignations));
+                    @endphp
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                        </div>
+                        <input type="text" name="designations" id="designations"
+                            placeholder="e.g. Manager, Senior Specialist, Junior Specialist, Intern"
+                            value="{{ old('designations', $designationsStr) }}"
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400">
+                    </div>
+                    <div class="mt-2.5 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        <p>&bull; <strong>Comma-separated titles:</strong> Populates the job title dropdown when adding/editing employees.</p>
+                        <p>&bull; <strong>Manager role:</strong> "Manager" title automatically receives the Manager role in security rules.</p>
+                    </div>
+                </div>
+
+                {{-- Active Status --}}
+                <div class="md:col-span-2 pt-2">
+                    <label for="is_active" class="inline-flex items-center gap-3 cursor-pointer">
+                        <input type="hidden" name="is_active" value="0">
+                        <input type="checkbox" name="is_active" id="is_active" value="1"
+                            @checked(old('is_active', $department->is_active))
+                            class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Department is Active</span>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Disabling stops offering this department for new users. Existing members keep assignments.</p>
+                        </div>
+                    </label>
+                </div>
+
             </div>
 
-            <div class="mb-5">
-                <label for="description"
-                    class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
-                    Description</label>
-                <input type="text" name="description" id="description" maxlength="255"
-                    placeholder="What this department does"
-                    value="{{ old('description', $department->description) }}"
-                    class="shadow-sm appearance-none border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-            </div>
-
-            <div class="mb-5">
-                <label for="manager_id" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">
-                    Manager *</label>
-                <select name="manager_id" id="manager_id" required
-                    class="shadow-sm border border-gray-300 dark:border-gray-600 rounded-lg w-full py-2.5 px-4 text-gray-700 dark:text-gray-300 dark:bg-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
-                    {{-- Keep the current manager selectable even if they no
-                         longer meet the eligibility rule, so saving does not
-                         silently swap them. --}}
-                    @if ($department->manager && ! $managers->contains($department->manager))
-                        <option value="{{ $department->manager->id }}" selected>
-                            {{ $department->manager->name }} — {{ $department->manager->email }}
-                        </option>
-                    @endif
-                    @foreach ($managers as $manager)
-                        <option value="{{ $manager->id }}"
-                            {{ (int) old('manager_id', $department->manager_id) === $manager->id ? 'selected' : '' }}>
-                            {{ $manager->name }} — {{ $manager->email }}
-                        </option>
-                    @endforeach
-                </select>
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    Active users holding the admin or manager role. Every member of this department
-                    reports to whoever is set here.
-                </p>
-            </div>
-
-            <div class="mb-5">
-                <label for="is_active"
-                    class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input type="hidden" name="is_active" value="0">
-                    <input type="checkbox" name="is_active" id="is_active" value="1"
-                        @checked(old('is_active', $department->is_active))
-                        class="rounded border-gray-300 dark:border-gray-600 text-gray-500 focus:ring-gray-500">
-                    <span class="font-semibold">Department is active</span>
-                </label>
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 ml-6">
-                    Turning this off stops the department being offered for new users. Existing members
-                    keep their assignment.
-                </p>
-            </div>
-
-            <div class="flex gap-3">
-                <button type="submit"
-                    class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white font-semibold py-2.5 px-5 rounded-lg text-sm shadow-md transition-all duration-200">
-                    Save Changes
-                </button>
+            <!-- Bottom Action Bar -->
+            <div class="pt-6 border-t border-gray-100 dark:border-gray-700/80 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <a href="{{ route('admin.departments.show', $department) }}"
-                    class="bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 font-semibold py-2.5 px-5 rounded-lg text-sm transition-all duration-200">
+                    class="text-sm font-semibold text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors order-2 sm:order-1">
                     Cancel
                 </a>
+                <div class="flex items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
+                    <button type="submit"
+                        class="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] text-center">
+                        Save Changes
+                    </button>
+                </div>
             </div>
+
         </form>
+
     </div>
+</div>
 @endsection

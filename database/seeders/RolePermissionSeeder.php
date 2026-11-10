@@ -86,6 +86,148 @@ class RolePermissionSeeder extends Seeder
             ]);
         }
 
+        // Grant employee self-service & dashboard permissions to all non-admin roles
+        $selfServicePermissions = [
+            'dashboard.view',
+            'my_attendance.view',
+            'my_leaves.view',
+            'my_leaves.create',
+            'my_expenses.view',
+            'my_expenses.create',
+        ];
+        foreach (Rbac::ROLES as $roleName) {
+            if ($roleName === Rbac::ADMIN_ROLE) {
+                continue;
+            }
+            $role = Role::where('name', $roleName)->where('guard_name', Rbac::GUARD)->first();
+            if ($role) {
+                $role->givePermissionTo($selfServicePermissions);
+            }
+        }
+
+        // Sales Manager
+        $salesManagerRole = Role::where('name', 'sales_manager')->where('guard_name', Rbac::GUARD)->first();
+        if ($salesManagerRole) {
+            $salesManagerRole->syncPermissions(array_merge($selfServicePermissions, [
+                'team.view',
+                'reports.performance',
+                'sales_tracking.view',
+                'customers.view', 'customers.create', 'customers.edit', 'customers.delete', 'customers.export',
+                'leads.view', 'leads.create', 'leads.edit', 'leads.delete', 'leads.export', 'leads.reassign', 'leads.import', 'leads.convert', 'leads.notes.create', 'leads.notes.delete',
+                'followups.view', 'followups.create', 'followups.edit', 'followups.delete',
+                'invoices.view', 'invoices.create', 'invoices.edit', 'invoices.export',
+                'expenses.view', 'expenses.approve',
+                'attendance.view',
+                'leaves.view', 'leaves.approve',
+            ]));
+        }
+
+        // Marketing Manager - Strictly NO Sales module permissions
+        $marketingManagerRole = Role::where('name', 'marketing_manager')->where('guard_name', Rbac::GUARD)->first();
+        if ($marketingManagerRole) {
+            $marketingManagerRole->syncPermissions(array_merge($selfServicePermissions, [
+                'team.view',
+                'reports.performance',
+                'tasks.view', 'tasks.create', 'tasks.edit', 'tasks.delete',
+                'content.view', 'content.create', 'content.edit', 'content.delete', 'content.assign', 'content.review', 'content.publish', 'content.brands', 'content.accounts', 'content.reports',
+                'expenses.view', 'expenses.approve',
+                'attendance.view',
+                'leaves.view', 'leaves.approve',
+            ]));
+        }
+
+        // Development Manager - Strictly NO Sales module permissions
+        $devManagerRole = Role::where('name', 'development_manager')->where('guard_name', Rbac::GUARD)->first();
+        if ($devManagerRole) {
+            $devManagerRole->syncPermissions(array_merge($selfServicePermissions, [
+                'team.view',
+                'reports.performance',
+                'tasks.view', 'tasks.create', 'tasks.edit', 'tasks.delete',
+                'expenses.view', 'expenses.approve',
+                'attendance.view',
+                'leaves.view', 'leaves.approve',
+            ]));
+        }
+
+        // HR Manager
+        $hrManagerRole = Role::where('name', 'hr_manager')->where('guard_name', Rbac::GUARD)->first();
+        if ($hrManagerRole) {
+            $hrManagerRole->syncPermissions(array_merge($selfServicePermissions, [
+                'team.view',
+                'reports.performance',
+                'departments.view',
+                'users.view', 'users.create', 'users.edit',
+                'payroll.view', 'payroll.create', 'payroll.edit', 'payroll.delete', 'payroll.export',
+                'attendance.view', 'attendance.create', 'attendance.edit', 'attendance.export',
+                'leaves.view', 'leaves.create', 'leaves.edit', 'leaves.approve', 'leaves.settings',
+                'holidays.view', 'holidays.create', 'holidays.edit', 'holidays.delete',
+            ]));
+        }
+
+        // HR Staff
+        $hrRole = Role::where('name', 'hr')->where('guard_name', Rbac::GUARD)->first();
+        if ($hrRole) {
+            $hrRole->syncPermissions(array_merge($selfServicePermissions, [
+                'departments.view',
+                'users.view', 'users.create', 'users.edit',
+                'attendance.view',
+                'leaves.view',
+                'holidays.view',
+            ]));
+        }
+
+        // Sales Staff
+        $salesRole = Role::where('name', 'sales')->where('guard_name', Rbac::GUARD)->first();
+        if ($salesRole) {
+            $salesRole->syncPermissions(array_merge($selfServicePermissions, [
+                'sales_tracking.view',
+                'customers.view',
+                'leads.view',
+                'leads.edit',
+                'leads.notes.create',
+                'followups.view',
+                'followups.create',
+                'followups.edit',
+                'followups.delete',
+            ]));
+        }
+
+        // Marketing Staff
+        $marketingRole = Role::where('name', 'marketing')->where('guard_name', Rbac::GUARD)->first();
+        if ($marketingRole) {
+            $marketingRole->syncPermissions(array_merge($selfServicePermissions, [
+                'tasks.view',
+                'tasks.edit',
+                'content.view',
+                'content.create',
+                'content.edit',
+                'content.publish',
+            ]));
+        }
+
+        // Development Staff
+        $devRole = Role::where('name', 'development')->where('guard_name', Rbac::GUARD)->first();
+        if ($devRole) {
+            $devRole->syncPermissions(array_merge($selfServicePermissions, [
+                'tasks.view',
+                'tasks.edit',
+            ]));
+        }
+
+        // Fallback manager role - remove sales permissions
+        $managerRole = Role::where('name', 'manager')->where('guard_name', Rbac::GUARD)->first();
+        if ($managerRole) {
+            $managerRole->syncPermissions(array_merge($selfServicePermissions, [
+                'team.view',
+                'reports.performance',
+                'tasks.view', 'tasks.create', 'tasks.edit',
+                'content.view', 'content.create', 'content.edit', 'content.assign', 'content.review', 'content.publish', 'content.brands', 'content.accounts', 'content.reports',
+                'expenses.view', 'expenses.approve',
+                'attendance.view',
+                'leaves.view', 'leaves.approve',
+            ]));
+        }
+
         $this->command?->info('Roles: '.implode(', ', Rbac::ROLES));
     }
 
@@ -127,11 +269,13 @@ class RolePermissionSeeder extends Seeder
         if ($scopedModules === []) {
             return;
         }
+        
 
         foreach (Rbac::ROLES as $roleName) {
+            $isManager = ($roleName === 'manager' || str_ends_with($roleName, '_manager'));
             $scope = $roleName === Rbac::ADMIN_ROLE
                 ? \App\Rbac\DataScope::ALL
-                : \App\Rbac\DataScope::OWN;
+                : ($isManager ? \App\Rbac\DataScope::TEAM : \App\Rbac\DataScope::OWN);
 
             foreach ($scopedModules as $module) {
                 \Illuminate\Support\Facades\DB::table('role_module_scopes')->updateOrInsert(

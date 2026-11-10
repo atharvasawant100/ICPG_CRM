@@ -6,9 +6,6 @@
 @section('content')
     <div class="mb-4 sm:mb-5 md:mb-6">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Audit Log</h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            A record of who did what, and when. Entries cannot be edited or removed.
-        </p>
     </div>
 
     <!-- Filters -->

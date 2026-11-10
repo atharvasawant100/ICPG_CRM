@@ -83,8 +83,10 @@ class RolesModuleTest extends RbacTestCase
     public function test_saving_the_matrix_changes_permissions(): void
     {
         $sales = $this->role('sales');
+        $sales->revokePermissionTo('leads.view');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $this->assertFalse($sales->hasPermissionTo('leads.view'));
+        $this->assertFalse($sales->fresh()->hasPermissionTo('leads.view'));
 
         $this->actingAs($this->admin())
             ->put("/admin/roles/{$sales->id}", [
@@ -170,6 +172,9 @@ class RolesModuleTest extends RbacTestCase
     public function test_a_temporary_role_can_be_used_immediately_after_saving(): void
     {
         $sales = $this->role('sales');
+        $sales->revokePermissionTo('leads.view');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $user = \App\Models\User::factory()->create();
         $user->assignRbacRole('sales');
 
@@ -274,5 +279,32 @@ class RolesModuleTest extends RbacTestCase
 
         // but settings.view does exist.
         $response->assertSee('permissions[settings][view]', false);
+    }
+
+    public function test_department_manager_inherits_department_role_permissions(): void
+    {
+        $sales = $this->role('sales');
+        $sales->givePermissionTo(Permission::findByName('customers.view', Rbac::GUARD));
+        $sales->givePermissionTo(Permission::findByName('leads.view', Rbac::GUARD));
+
+        $salesManager = \App\Models\User::factory()->create([
+            'department' => 'sales',
+            'designation' => 'manager',
+        ]);
+        $salesManager->assignRbacRole('sales_manager');
+
+        $devManager = \App\Models\User::factory()->create([
+            'department' => 'development',
+            'designation' => 'manager',
+        ]);
+        $devManager->assignRbacRole('development_manager');
+
+        // Sales Manager inherits permissions granted to the sales role
+        $this->assertTrue($salesManager->can('customers.view'));
+        $this->assertTrue($salesManager->can('leads.view'));
+
+        // Other department managers do not inherit sales permissions
+        $this->assertFalse($devManager->can('customers.view'));
+        $this->assertFalse($devManager->can('leads.view'));
     }
 }

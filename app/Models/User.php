@@ -38,6 +38,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'emp_id',
         'name',
         'email',
         'password',
@@ -46,8 +47,36 @@ class User extends Authenticatable
         'department',
         'designation',
         'manager_id',
+        'avatar',
         'is_active',
     ];
+
+    /**
+     * Generate the next sequential EMP ID (e.g. ICPG_01, ICPG_02).
+     */
+    public static function nextEmpId(): string
+    {
+        $prefix = 'ICPG_';
+
+        $empIds = static::query()
+            ->whereNotNull('emp_id')
+            ->where('emp_id', 'like', "{$prefix}%")
+            ->pluck('emp_id');
+
+        $maxNum = 0;
+        foreach ($empIds as $id) {
+            if (preg_match('/^ICPG_(\d+)$/i', (string) $id, $matches)) {
+                $num = (int) $matches[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        $nextNum = $maxNum + 1;
+
+        return sprintf('%s%02d', $prefix, $nextNum);
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -83,12 +112,153 @@ class User extends Authenticatable
      */
     public function isAdmin(): bool
     {
+        if ($this->getAttribute('role') === \App\Rbac\Rbac::ADMIN_ROLE) {
+            return true;
+        }
+
         try {
             return $this->hasRole(\App\Rbac\Rbac::ADMIN_ROLE);
-        } catch (Throwable) {
-            return $this->getAttribute('role') === \App\Rbac\Rbac::ADMIN_ROLE;
+        } catch (\Throwable) {
+            return false;
         }
     }
+
+    /**
+     * Check if the user is in Human Resources (HR role, HR department, or HR designation).
+     */
+    public function isHr(): bool
+    {
+        try {
+            if ($this->hasRole('hr') || $this->hasRole('hr_manager')) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        $role = strtolower((string) $this->getAttribute('role'));
+        $dept = strtolower((string) $this->department);
+        $designation = strtolower((string) $this->designation);
+
+        if ($role === 'hr'
+            || $role === 'hr_manager'
+            || $dept === 'hr'
+            || str_contains($role, 'hr')
+            || str_contains($dept, 'hr')
+            || str_contains($designation, 'hr')
+            || str_contains($designation, 'human resource')) {
+            return true;
+        }
+
+        try {
+            return \App\Models\Department::where('manager_id', $this->id)
+                ->where(function ($q) {
+                    $q->whereRaw('LOWER(name) LIKE ?', ['%hr%'])
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%human resource%']);
+                })->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if the user belongs to the Sales department.
+     */
+    public function isSales(): bool
+    {
+        try {
+            if ($this->hasRole('sales') || $this->hasRole('sales_manager')) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        $role = strtolower((string) $this->getAttribute('role'));
+        $dept = strtolower((string) $this->department);
+        $designation = strtolower((string) $this->designation);
+
+        if ($role === 'sales'
+            || $role === 'sales_manager'
+            || $dept === 'sales'
+            || str_contains($role, 'sales')
+            || str_contains($dept, 'sales')
+            || str_contains($designation, 'sales')) {
+            return true;
+        }
+
+        try {
+            return \App\Models\Department::where('manager_id', $this->id)
+                ->where(function ($q) {
+                    $q->whereRaw('LOWER(name) LIKE ?', ['%sales%'])
+                      ->orWhereRaw('LOWER(description) LIKE ?', ['%sales%']);
+                })->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Determine whether this user participates in tasks workflow.
+     * All active employees can create and participate in tasks.
+     */
+    public function hasTasks(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Check if the user is a department manager.
+     */
+    public function isManager(): bool
+    {
+        $role = strtolower((string) $this->getAttribute('role'));
+        $designation = strtolower((string) $this->designation);
+
+        if ($role === 'manager' || str_ends_with($role, '_manager') || str_contains($designation, 'manager')) {
+            return true;
+        }
+
+        try {
+            if ($this->hasRole(\App\Rbac\Rbac::MANAGER_ROLE) || $this->roles->contains(fn ($r) => str_ends_with($r->name, '_manager'))) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        try {
+            return \App\Models\Department::where('manager_id', $this->id)->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if the given operator user can manage/update this user's avatar.
+     * Allowed: Admin, HR, and the user themselves.
+     */
+    public function canManageAvatar(?User $operator): bool
+    {
+        if (! $operator) {
+            return false;
+        }
+
+        return $operator->isAdmin()
+            || $operator->isHr()
+            || (int) $operator->id === (int) $this->id
+            || $operator->can('users.edit');
+    }
+
+    /**
+     * Get avatar public URL if avatar exists.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if ($this->avatar && \Illuminate\Support\Facades\Storage::disk('public')->exists($this->avatar)) {
+            return asset('storage/' . $this->avatar);
+        }
+
+        return null;
+    }
+
 
     /**
      * The user's manager.
@@ -96,6 +266,32 @@ class User extends Authenticatable
     public function manager(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(self::class, 'manager_id');
+    }
+
+    /**
+     * Resolve the department manager for this user.
+     * Checks direct manager_id, then department manager_id, then active manager in the department.
+     */
+    public function departmentManager(): ?User
+    {
+        if ($this->manager_id && $this->manager) {
+            return $this->manager;
+        }
+
+        if ($this->department) {
+            $dept = Department::whereRaw('LOWER(name) = ?', [strtolower($this->department)])->first();
+            if ($dept && $dept->manager_id && $dept->manager) {
+                return $dept->manager;
+            }
+
+            return self::active()
+                ->where('id', '!=', $this->id)
+                ->whereRaw('LOWER(department) = ?', [strtolower($this->department)])
+                ->get()
+                ->first(fn ($u) => $u->isManager());
+        }
+
+        return null;
     }
 
     /**
@@ -173,5 +369,55 @@ class User extends Authenticatable
     public function services(): HasMany
     {
         return $this->hasMany(Service::class, 'created_by');
+    }
+
+    public function salary(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EmployeeSalary::class);
+    }
+
+    public function payrolls(): HasMany
+    {
+        return $this->hasMany(Payroll::class);
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function leaveBalances(): HasMany
+    {
+        return $this->hasMany(EmployeeLeaveBalance::class);
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    public function createdTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_by');
+    }
+
+    public function taskWorkLogs(): HasMany
+    {
+        return $this->hasMany(TaskWorkLog::class);
+    }
+
+    public function assignedContentPosts(): HasMany
+    {
+        return $this->hasMany(ContentPost::class, 'assigned_to');
+    }
+
+    public function createdContentPosts(): HasMany
+    {
+        return $this->hasMany(ContentPost::class, 'created_by');
     }
 }

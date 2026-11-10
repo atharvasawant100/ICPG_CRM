@@ -25,6 +25,7 @@ class Lead extends Model
         'company',
         'source',
         'status',
+        'assigned_to',
         'extra_fields',
         'created_by',
         'converted_to_customer_id',
@@ -157,6 +158,54 @@ class Lead extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Get the employee assigned to this lead
+     */
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /**
+     * Get status transition history
+     */
+    public function statusLogs()
+    {
+        return $this->hasMany(LeadStatusLog::class)->latest();
+    }
+
+    /**
+     * Change lead status with audit logging
+     */
+    public function recordStatusChange(string $newStatus, ?int $userId = null, ?string $notes = null): void
+    {
+        $oldStatus = $this->status;
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        $userId = $userId ?? auth()->id() ?? $this->assigned_to ?? $this->created_by;
+
+        $this->update(['status' => $newStatus]);
+
+        LeadStatusLog::create([
+            'lead_id' => $this->id,
+            'changed_by' => $userId,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'notes' => $notes,
+        ]);
+
+        LeadActivity::create([
+            'lead_id' => $this->id,
+            'user_id' => $userId,
+            'activity_type' => 'status_changed',
+            'description' => 'Status changed: ' . ucfirst(str_replace('_', ' ', $oldStatus)) . ' → ' . ucfirst(str_replace('_', ' ', $newStatus)) . ($notes ? " ({$notes})" : ''),
+            'old_value' => $oldStatus,
+            'new_value' => $newStatus,
+        ]);
     }
 
     /**

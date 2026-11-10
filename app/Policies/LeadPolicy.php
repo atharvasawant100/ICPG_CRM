@@ -60,8 +60,17 @@ class LeadPolicy extends BasePolicy
         return $this->permittedFor($user, 'leads.notes.delete', $lead, 'leads');
     }
 
-    public function reassign(User $user, Lead $lead): bool
+    public function reassign(User $user, ?Lead $lead = null): bool
     {
+        if ($lead === null) {
+            return $this->permittedForModule($user, 'leads.reassign');
+        }
+
         return $this->permittedFor($user, 'leads.reassign', $lead, 'leads');
+    }
+
+    public function updateStatus(User $user, Lead $lead): bool
+    {
+        return $this->permittedFor($user, 'leads.edit', $lead, 'leads');
     }
 }

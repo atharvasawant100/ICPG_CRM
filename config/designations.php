@@ -58,7 +58,27 @@ return [
      | dependent dropdown re-renders from it with no restart.
      */
     'departments' => [
-        // 'development' => ['intern' => 'Intern', 'software developer' => 'Software Developer', ...],
+        'development' => [
+            'intern' => 'Intern',
+            'software developer' => 'Software Developer',
+            'senior software developer' => 'Senior Software Developer',
+            'team leader' => 'Team Leader',
+            'manager' => 'Manager',
+        ],
+        'hr' => [
+            'hr executive' => 'HR Executive',
+        ],
+        'marketing' => [
+            'marketing intern' => 'Marketing Intern',
+            'marketing executive' => 'Marketing Executive',
+            'marketing manager' => 'Marketing Manager',
+        ],
+        'sales' => [
+            'intern' => 'Intern',
+            'business executive' => 'Business Executive',
+            'tl' => 'TL',
+            'manager' => 'Manager',
+        ],
     ],
 
     /*
@@ -67,6 +87,7 @@ return [
      */
     'elevates_to' => [
         'manager' => 'manager',
+        'marketing manager' => 'manager',
     ],
 
     /*

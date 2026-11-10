@@ -24,7 +24,69 @@ final class Navigation
             return true;
         }
 
-        return $user !== null && $user->can($permission);
+        if ($user === null) {
+            return false;
+        }
+
+        // Tasks module is completely excluded from HR and the Sales Department
+        if ($permission === 'tasks.view') {
+            if ($user->isHr() || ($user->department && strtolower((string) $user->department) === 'sales')) {
+                return false;
+            }
+            return true;
+        }
+
+        // Employee Costing report is exclusive to Company Owner (Admin)
+        if ($permission === 'reports.costing') {
+            return $user->isAdmin();
+        }
+
+        // Manager Performance Tracking report is exclusive to Admin and Department Managers
+        if ($permission === 'reports.performance') {
+            return $user->isAdmin() || $user->isManager();
+        }
+
+        // Team module is exclusive to Department Managers for their team (not for Admin or HR)
+        if ($permission === 'team.view') {
+            if ($user->isAdmin() || $user->isHr()) {
+                return false;
+            }
+            return $user->isManager();
+        }
+
+        // Sales module is strictly exclusive to Admin and Sales department
+        $module = explode('.', $permission)[0];
+        if (in_array($module, ['customers', 'sales_tracking', 'leads', 'followups'], true)) {
+            if (! $user->isAdmin() && ! $user->isSales()) {
+                return false;
+            }
+        }
+
+        if ($user->isAdmin()) {
+            // Admins do not have employee self-service attendance, leaves, or personal expense claims
+            if (in_array($permission, ['my_attendance.view', 'my_leaves.view', 'my_expenses.view'], true)) {
+                return false;
+            }
+
+            // In Admin Panel administration section: keep only Roles & Permission, Department Module, and Audit module.
+            // Exclude operational payroll, user management, attendance, leaves, and settings from Admin navigation.
+            if (in_array($permission, [
+                'payroll.view',
+                'payroll.create',
+                'payroll.edit',
+                'users.view',
+                'users.create',
+                'attendance.view',
+                'attendance.create',
+                'leaves.view',
+                'leaves.create',
+                'settings.view',
+            ], true)) {
+                return false;
+            }
+        }
+
+        return $user->can($permission);
     }
 
     /**
@@ -49,6 +111,14 @@ final class Navigation
         foreach ($section['items'] ?? [] as $item) {
             if (! self::can($user, $item['permission'] ?? null)) {
                 continue;
+            }
+
+            // In Admin Panel administration section: keep only Roles & Permission, Department Module, and Audit module
+            if ($user && $user->isAdmin() && ($section['label'] ?? '') === 'Administration') {
+                $allowedLabels = ['Roles & Permissions', 'Departments', 'Audit Log'];
+                if (! in_array($item['label'] ?? '', $allowedLabels, true)) {
+                    continue;
+                }
             }
 
             $children = self::filterChildren($item['children'] ?? [], $user);
@@ -161,8 +231,13 @@ final class Navigation
      */
     public static function expenseScopeLabel(?User $user): string
     {
-        return DataScope::scopeFor($user, 'expenses') === DataScope::ALL
-            ? 'All Expenses'
-            : 'My Expenses';
+        $scope = DataScope::scopeFor($user, 'expenses');
+        if ($scope === DataScope::ALL) {
+            return 'All Expenses';
+        }
+        if ($scope === DataScope::TEAM) {
+            return 'Team Expenses';
+        }
+        return 'My Expenses';
     }
 }

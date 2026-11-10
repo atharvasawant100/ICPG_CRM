@@ -29,6 +29,7 @@ class UpdateDepartmentRequest extends FormRequest
              | no-op for a department that already has one.
              */
             'manager_id' => ['required', 'integer', Rule::exists('users', 'id')],
+            'designations' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -49,7 +50,7 @@ class UpdateDepartmentRequest extends FormRequest
             }
 
             $isEligible = $manager->is_active
-                && ($manager->hasRole(Rbac::ADMIN_ROLE) || $manager->hasRole('manager'));
+                && ($manager->hasRole(Rbac::ADMIN_ROLE) || $manager->isManager());
 
             if (! $isEligible) {
                 $validator->errors()->add(

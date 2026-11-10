@@ -26,8 +26,11 @@ class StoreCustomerRequest extends FormRequest
             'email' => 'required|email|max:255|unique:customers,email',
             'phone' => 'nullable|string|max:255',
             'company' => 'nullable|string|max:255',
+            'brands' => 'nullable|string|max:1000',
             'address' => 'nullable|string',
             'status' => 'nullable|in:active,inactive',
+            'designated_person' => 'nullable|string|max:255',
+            'assigned_to' => 'nullable|exists:users,id',
         ];
 
         return $rules;

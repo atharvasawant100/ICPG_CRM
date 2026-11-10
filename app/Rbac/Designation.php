@@ -27,10 +27,29 @@ final class Designation
      */
     public static function forDepartment(?string $department): array
     {
-        $departments = (array) config('designations.departments', []);
+        if ($department !== null && $department !== '') {
+            $normalized = strtolower(trim($department));
 
-        if ($department !== null && isset($departments[$department])) {
-            return (array) $departments[$department];
+            // Check if department model in database has customized designations
+            try {
+                $deptModel = Department::query()->where('name', $normalized)->first();
+                if ($deptModel && ! empty($deptModel->designations)) {
+                    return $deptModel->parsedDesignations();
+                }
+            } catch (\Throwable) {
+                // Table might not exist during early migrations
+            }
+
+            $departments = (array) config('designations.departments', []);
+            if (isset($departments[$department])) {
+                return (array) $departments[$department];
+            }
+
+            foreach ($departments as $key => $values) {
+                if (strtolower(trim((string) $key)) === $normalized) {
+                    return (array) $values;
+                }
+            }
         }
 
         return (array) config('designations.default', []);
@@ -48,7 +67,15 @@ final class Designation
         $map = [];
 
         foreach (Department::names() as $name) {
-            $map[$name] = self::forDepartment($name);
+            $options = self::forDepartment($name);
+            $map[$name] = $options;
+            $map[strtolower(trim($name))] = $options;
+        }
+
+        foreach (array_keys((array) config('designations.departments', [])) as $key) {
+            $options = self::forDepartment((string) $key);
+            $map[$key] = $options;
+            $map[strtolower(trim((string) $key))] = $options;
         }
 
         return $map;
@@ -79,8 +106,25 @@ final class Designation
 
         $elevates = (array) config('designations.elevates_to', []);
 
-        if ($slug !== '' && isset($elevates[$slug])) {
-            return (string) $elevates[$slug];
+        if ($slug !== '') {
+            if (isset($elevates[$slug])) {
+                return (string) $elevates[$slug];
+            }
+
+            if ($slug === 'manager' || str_contains($slug, 'manager')) {
+                if ($department !== null && $department !== '') {
+                    $deptKey = strtolower(trim($department));
+                    if (isset(Rbac::DEPARTMENT_MANAGERS[$deptKey])) {
+                        return Rbac::DEPARTMENT_MANAGERS[$deptKey];
+                    }
+                    $candidate = "{$deptKey}_manager";
+                    if (self::roleExists($candidate)) {
+                        return $candidate;
+                    }
+                }
+
+                return Rbac::MANAGER_ROLE;
+            }
         }
 
         return self::departmentRole($department);
@@ -156,7 +200,22 @@ final class Designation
             ...array_values((array) config('designations.departments', []))
         );
 
-        return $all[$slug] ?? (string) $designation;
+        if (isset($all[$slug])) {
+            return $all[$slug];
+        }
+
+        // Check if any department in DB defines this designation
+        try {
+            foreach (Department::all() as $dept) {
+                $parsed = $dept->parsedDesignations();
+                if (isset($parsed[$slug])) {
+                    return $parsed[$slug];
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return (string) $designation;
     }
 
     /**

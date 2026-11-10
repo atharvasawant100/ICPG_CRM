@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Mail\InvoiceMail;
+use App\Models\EmailLog;
 use App\Models\Invoice;
 use App\Services\InvoiceEmailService;
 use Illuminate\Console\Command;
@@ -11,7 +13,7 @@ class SendOverdueInvoiceReminders extends Command
 {
     protected $signature = 'invoices:send-overdue-reminders {--dry-run : Do not send, only show counts}';
 
-    protected $description = 'Send one overdue reminder email per invoice per day until it is paid';
+    protected $description = 'Queue one overdue reminder email per invoice per day until it is paid';
 
     public function handle(): int
     {
@@ -33,6 +35,23 @@ class SendOverdueInvoiceReminders extends Command
 
         $service = new InvoiceEmailService();
 
+        /*
+         | Reminders already queued or delivered today, keyed by invoice.
+         |
+         | Read from the email log rather than invoices.overdue_reminder_last_sent_at:
+         | that column is only stamped once the worker delivers, so a backed-up
+         | queue would otherwise let a second run mail the same customer twice.
+         */
+        $alreadyHandledToday = EmailLog::query()
+            ->where('type', InvoiceMail::TYPE_OVERDUE_REMINDER)
+            ->whereIn('status', [EmailLog::STATUS_QUEUED, EmailLog::STATUS_SENT])
+            ->where('created_at', '>=', $now->startOfDay())
+            ->get(['context', 'id'])
+            ->map(fn (EmailLog $log) => $log->context['invoice_id'] ?? null)
+            ->filter()
+            ->flip()
+            ->all();
+
         foreach ($invoices as $invoice) {
             $customerEmail = $invoice->customer?->email;
             if (!$customerEmail) {
@@ -46,7 +65,7 @@ class SendOverdueInvoiceReminders extends Command
                 continue;
             }
 
-            if ($invoice->overdue_reminder_last_sent_at?->isSameDay($now)) {
+            if (isset($alreadyHandledToday[$invoice->id])) {
                 $skipped++;
                 continue;
             }
@@ -57,17 +76,20 @@ class SendOverdueInvoiceReminders extends Command
             }
 
             try {
-                $service->sendOverdueReminder($invoice, true);
+                $log = $service->queueOverdueReminder($invoice, true);
 
-                $invoice->forceFill([
-                    'overdue_reminder_last_sent_at' => $now,
-                    'overdue_reminder_sent_count' => (int) ($invoice->overdue_reminder_sent_count ?? 0) + 1,
-                ])->save();
+                if ($log === null) {
+                    $skipped++;
+                    continue;
+                }
+
+                // Claim the slot now so a second run today cannot re-queue.
+                $alreadyHandledToday[$invoice->id] = $log->id;
 
                 $sent++;
             } catch (\Throwable $e) {
                 $failed++;
-                Log::error('Overdue reminder email failed', [
+                Log::error('Failed to queue overdue reminder email', [
                     'invoice_id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
                     'customer_email' => $customerEmail,
@@ -76,7 +98,7 @@ class SendOverdueInvoiceReminders extends Command
             }
         }
 
-        $this->info("Overdue reminders: candidates={$totalCandidates}, sent={$sent}, skipped={$skipped}, failed={$failed}" . ($dryRun ? ' (dry-run)' : ''));
+        $this->info("Overdue reminders: candidates={$totalCandidates}, queued={$sent}, skipped={$skipped}, failed={$failed}" . ($dryRun ? ' (dry-run)' : ''));
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
     }

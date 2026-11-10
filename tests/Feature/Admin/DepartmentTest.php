@@ -91,6 +91,36 @@ class DepartmentTest extends RbacTestCase
         $this->assertStringNotContainsString(route('admin.departments.index'), $nav);
     }
 
+    public function test_hr_user_sees_departments_section_with_cards_and_employees(): void
+    {
+        $hrUser = User::factory()->create([
+            'name' => 'Katrina HR',
+            'department' => 'hr',
+            'designation' => 'hr executive',
+        ]);
+        $hrUser->assignRbacRole('hr');
+
+        $devEmp = User::factory()->create([
+            'name' => 'Alex Developer',
+            'department' => 'development',
+            'emp_id' => 'ICPG_20',
+        ]);
+
+        $response = $this->actingAs($hrUser)->get(route('admin.departments.index'));
+        $response->assertSuccessful();
+        $response->assertSee('Departments');
+        $response->assertSee('Department Cards');
+        $response->assertSee('Employees Directory');
+        $response->assertSee('Development');
+        $response->assertSee('Alex Developer');
+        $response->assertSee('ICPG_20');
+
+        // Verify Departments link appears in sidebar for HR
+        $nav = $this->sidebarHtml($response->getContent());
+        $this->assertStringContainsString('Departments', $nav);
+        $this->assertStringContainsString(route('admin.departments.index'), $nav);
+    }
+
     // ---- Creating ---------------------------------------------------------
 
     public function test_admin_can_add_a_department_with_a_manager(): void
@@ -186,26 +216,45 @@ class DepartmentTest extends RbacTestCase
     }
 
     /**
- * The manager dropdowns must not offer "no manager", otherwise the UI would
- * contradict the validation.
- */
-public function test_the_dropdowns_do_not_offer_a_no_manager_option(): void
+     * The manager dropdowns must not offer "no manager", otherwise the UI would
+     * contradict the validation.
+     */
+    public function test_the_dropdowns_do_not_offer_a_no_manager_option(): void
     {
         $manager = $this->managerCandidate('manager');
         $department = Department::where('name', 'sales')->firstOrFail();
         $department->update(['manager_id' => $manager->id]);
 
-        // Create panel on the index, and the edit page.
-        $index = $this->actingAs($this->admin())->get(route('admin.departments.index'))->getContent();
+        // Create page, and the edit page.
+        $create = $this->actingAs($this->admin())->get(route('admin.departments.create'))->getContent();
         $edit = $this->actingAs($this->admin())->get(route('admin.departments.edit', $department))->getContent();
 
-        $this->assertNotEmpty($this->managerSelects($index));
+        $this->assertNotEmpty($this->managerSelects($create));
         $this->assertNotEmpty($this->managerSelects($edit));
 
-        foreach (array_merge($this->managerSelects($index), $this->managerSelects($edit)) as $select) {
+        foreach (array_merge($this->managerSelects($create), $this->managerSelects($edit)) as $select) {
             $this->assertStringContainsString('required', $select);
             $this->assertStringNotContainsString('>No manager', $select);
         }
+    }
+
+    public function test_admin_can_open_the_create_page(): void
+    {
+        $response = $this->actingAs($this->admin())->get(route('admin.departments.create'));
+
+        $response->assertSuccessful();
+        $response->assertSee('Add New Department');
+        $response->assertSee('Designations (Job Titles)');
+        $response->assertSee('Department Manager');
+    }
+
+    public function test_create_page_requires_permission(): void
+    {
+        $user = $this->userWithPermissions(['departments.view'], 'view_only');
+
+        $this->actingAs($user)
+            ->get(route('admin.departments.create'))
+            ->assertForbidden();
     }
 
     /**
@@ -325,14 +374,14 @@ public function test_the_empty_manager_warning_is_hidden_from_read_only_visitors
         $this->assertFalse($candidates->contains($ineligibleEmployee->id));
         $this->assertFalse($candidates->contains($inactiveManager->id));
 
-        // And the same list reaches the form.
-        $response = $this->actingAs($this->admin())->get(route('admin.departments.index'));
+        // And the candidate list reaches the dedicated create page form.
+        $createResponse = $this->actingAs($this->admin())->get(route('admin.departments.create'));
 
-        $response->assertSuccessful();
-        $response->assertSee('Add Department');
-        $response->assertSee($eligibleManager->email);
-        $response->assertDontSee($ineligibleEmployee->email);
-        $response->assertDontSee($inactiveManager->email);
+        $createResponse->assertSuccessful();
+        $createResponse->assertSee('Add New Department');
+        $createResponse->assertSee($eligibleManager->email);
+        $createResponse->assertDontSee($ineligibleEmployee->email);
+        $createResponse->assertDontSee($inactiveManager->email);
     }
 
     public function test_an_ineligible_manager_is_rejected_even_if_forged(): void
@@ -666,8 +715,8 @@ public function test_the_edit_page_shows_the_current_manager(): void
         $this->assertStringNotContainsString('MANAGER</th>', strtoupper($table));
         $this->assertStringNotContainsString('Save', $table);
 
-        // One dropdown on the page: the create form. No per-row selects.
-        $this->assertCount(1, $this->managerSelects($html));
+        // Zero dropdowns on index: the create form is now on its own separate page.
+        $this->assertCount(0, $this->managerSelects($html));
     }
 
     public function test_the_index_links_to_view_and_edit_for_each_department(): void
@@ -708,6 +757,54 @@ public function test_the_edit_page_shows_the_current_manager(): void
             ->assertRedirect(route('admin.departments.show', $department));
 
         $this->assertSame('sales', $department->fresh()->name);
+    }
+
+    /**
+     * Creating a department automatically creates its Spatie role and designations,
+     * which then appears in the Roles & Permissions dashboard.
+     */
+    public function test_creating_department_creates_spatie_role_and_designations(): void
+    {
+        $manager = $this->managerCandidate();
+
+        $response = $this->actingAs($this->admin())->post(route('admin.departments.store'), [
+            'name' => 'Quality Assurance',
+            'description' => 'Software testing and QA',
+            'manager_id' => $manager->id,
+            'designations' => 'Manager, QA Lead, QA Engineer, QA Intern',
+            'is_active' => '1',
+        ]);
+
+        $role = \Spatie\Permission\Models\Role::where('name', 'quality assurance')->first();
+        $dept = Department::where('name', 'quality assurance')->first();
+        $this->assertNotNull($dept);
+        $response->assertRedirect(route('admin.departments.show', $dept));
+
+        // Check designations
+        $designations = $dept->parsedDesignations();
+        $this->assertArrayHasKey('manager', $designations);
+        $this->assertArrayHasKey('qa lead', $designations);
+        $this->assertArrayHasKey('qa engineer', $designations);
+        $this->assertArrayHasKey('qa intern', $designations);
+
+        // Check Spatie role was created
+        $role = \Spatie\Permission\Models\Role::where('name', 'quality assurance')->first();
+        $this->assertNotNull($role);
+        $this->assertTrue($role->hasPermissionTo('dashboard.view'));
+        $this->assertTrue($role->hasPermissionTo('my_attendance.view'));
+
+        // Check role appears on the Roles & Permissions dashboard
+        $rolesResponse = $this->actingAs($this->admin())->get(route('admin.roles.index'));
+        $rolesResponse->assertSuccessful();
+        $rolesResponse->assertSee('Quality assurance');
+
+        // Check user creation with this department and regular designation gets the department role
+        $empRole = \App\Rbac\Designation::roleFor('quality assurance', 'qa engineer');
+        $this->assertSame('quality assurance', $empRole);
+
+        // Check user creation with manager designation gets the manager role
+        $mgrRole = \App\Rbac\Designation::roleFor('quality assurance', 'manager');
+        $this->assertSame('manager', $mgrRole);
     }
 
     // ---- Helpers ----------------------------------------------------------

@@ -23,6 +23,7 @@ class UpdateExpenseRequest extends FormRequest
     {
         return [
             'category_id' => 'required|exists:expense_categories,id',
+            'ai_tool' => 'nullable|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'description' => 'nullable|string|max:1000',
             'expense_date' => 'required|date|before_or_equal:today',

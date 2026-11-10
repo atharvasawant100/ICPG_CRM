@@ -13,13 +13,10 @@ class ExpenseCategorySeeder extends Seeder
     public function run(): void
     {
         $categories = [
-            ['name' => 'Travel', 'description' => 'Travel and transportation expenses', 'is_custom' => false],
-            ['name' => 'Food', 'description' => 'Food and dining expenses', 'is_custom' => false],
-            ['name' => 'Office Supplies', 'description' => 'Office supplies and stationery', 'is_custom' => false],
-            ['name' => 'Utilities', 'description' => 'Utility bills and services', 'is_custom' => false],
-            ['name' => 'Marketing', 'description' => 'Marketing and advertising expenses', 'is_custom' => false],
-            ['name' => 'Equipment', 'description' => 'Equipment and hardware purchases', 'is_custom' => false],
-            ['name' => 'Other', 'description' => 'Other miscellaneous expenses', 'is_custom' => false],
+            ['name' => 'AI tools', 'description' => 'AI tools and software subscriptions', 'is_custom' => false],
+            ['name' => 'Trip Expense', 'description' => 'Business trips, lodging, and client visits', 'is_custom' => false],
+            ['name' => 'Travel Expense', 'description' => 'Local travel, cab, transit, and conveyance', 'is_custom' => false],
+            ['name' => 'Others', 'description' => 'Other miscellaneous business expenses', 'is_custom' => false],
         ];
 
         foreach ($categories as $category) {

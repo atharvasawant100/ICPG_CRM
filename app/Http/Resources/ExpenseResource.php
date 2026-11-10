@@ -21,6 +21,7 @@ class ExpenseResource extends JsonResource
             'expense_date' => $this->expense_date,
             'status' => $this->status,
             'category_id' => $this->category_id,
+            'ai_tool' => $this->ai_tool,
             'category' => $this->whenLoaded('category', function () {
                 return [
                     'id' => $this->category->id,

@@ -19,13 +19,90 @@
                     </span>
                 </div>
 
-                <h1 class="text-xl font-bold text-gray-900 dark:text-white mb-6">
+                <h1 class="text-xl font-bold text-gray-900 dark:text-white">
                     {{ $lead->name }}
                     @if($lead->company)
                         <span
                             class="block text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{{ $lead->company }}</span>
                     @endif
                 </h1>
+
+                <!-- Contact details sit right under the lead's name -->
+                <div class="mt-3 mb-6 space-y-1.5">
+                    <div class="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <svg class="w-4 h-4 mt-0.5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                        <a href="mailto:{{ $lead->email }}"
+                            class="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors break-all">{{ $lead->email }}</a>
+                    </div>
+                    <div class="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <svg class="w-4 h-4 mt-0.5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 5a2 2 0 012-2h2.586a1 1 0 01.707.293l1.414 1.414a1 1 0 010 1.414L8.414 7.586a2 2 0 00-.293.707L7.879 10H10a2 2 0 012 2v2.121l1.293-1.293a1 1 0 011.414 0l1.414 1.414A1 1 0 0122 15.414V18a2 2 0 01-2 2h-1.586a2 2 0 01-1.414-.586l-1.414-1.414a1 1 0 00-1.414 0L13 17.414a2 2 0 01-.586 1.414L11 20H7a2 2 0 01-2-2v-3.879a1 1 0 01.293-.707l1.414-1.414a1 1 0 000-1.414L5.293 4.293A1 1 0 004.586 4H4a2 2 0 01-2-2z">
+                            </path>
+                        </svg>
+                        @if($lead->phone)
+                            <a href="tel:{{ $lead->phone }}"
+                                class="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{{ $lead->phone }}</a>
+                        @else
+                            <span>-</span>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Assigned Salesperson Card -->
+                <div class="mb-5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Assigned Salesperson</span>
+                        @can('leads.reassign')
+                            @if (isset($assignableUsers) && $assignableUsers->isNotEmpty())
+                                <button type="button" onclick="document.getElementById('reassign-drawer').classList.toggle('hidden')"
+                                    class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                                    Reassign
+                                </button>
+                            @endif
+                        @endcan
+                    </div>
+
+                    @if ($lead->assignedUser)
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200 font-bold flex items-center justify-center text-xs">
+                                {{ strtoupper(substr($lead->assignedUser->name, 0, 2)) }}
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ $lead->assignedUser->name }}</div>
+                                <div class="text-[10px] text-slate-400">{{ $lead->assignedUser->email }}</div>
+                            </div>
+                        </div>
+                    @else
+                        <div class="text-xs text-slate-400 italic">No sales employee assigned yet.</div>
+                    @endif
+
+                    @can('leads.reassign')
+                        @if (isset($assignableUsers) && $assignableUsers->isNotEmpty())
+                            <div id="reassign-drawer" class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                <form action="{{ route('leads.reassign', $lead) }}" method="POST" class="space-y-2">
+                                    @csrf
+                                    <select name="assigned_to" required class="w-full text-xs rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 p-2">
+                                        <option value="">Select new assignee...</option>
+                                        @foreach ($assignableUsers as $u)
+                                            <option value="{{ $u->id }}" {{ $lead->assigned_to == $u->id ? 'selected' : '' }}>
+                                                {{ $u->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <input type="text" name="notes" placeholder="Reason/Notes (optional)" class="w-full text-xs rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 p-2">
+                                    <button type="submit" class="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors">
+                                        Save Assignment
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                    @endcan
+                </div>
 
                 <!-- Action Buttons -->
                 <div class="grid grid-cols-4 gap-2 mb-6">
@@ -102,76 +179,60 @@
                 </div>
             </div>
 
-            <!-- About Lead Card -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <div
-                    class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/50 rounded-t-xl">
-                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">About Lead</h3>
-                    <a href="{{ route('leads.edit', $lead) }}"
-                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
-                            </path>
+            <!-- About Lead Button: opens the modal with the full lead record -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <button type="button" onclick="openLeadDetailsModal()"
+                    class="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left">
+                    <span class="flex items-center gap-3">
+                        <span class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                </path>
+                            </svg>
+                        </span>
+                        <span class="font-semibold text-gray-800 dark:text-gray-200">About Lead</span>
+                    </span>
+                    <span class="flex items-center gap-2">
+                        <a href="{{ route('leads.edit', $lead) }}"
+                            onclick="event.stopPropagation()"
+                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                                </path>
+                            </svg>
+                        </a>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
-                    </a>
-                </div>
-                <div class="p-4 space-y-4">
-                    <div class="flex justify-between items-center group">
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Email</span>
-                        <span class="text-sm font-medium text-gray-800 dark:text-gray-200 text-right truncate max-w-[150px]"
-                            title="{{ $lead->email }}">{{ $lead->email }}</span>
-                    </div>
-                    <div class="flex justify-between items-center group">
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Phone</span>
-                        <span
-                            class="text-sm font-medium text-gray-800 dark:text-gray-200 text-right">{{ $lead->phone ?? '-' }}</span>
-                    </div>
-                    <div class="flex justify-between items-center group">
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Source</span>
-                        <span
-                            class="text-sm font-medium text-gray-800 dark:text-gray-200 text-right">{{ $lead->source ?? '-' }}</span>
-                    </div>
-                    @if(!empty($lead->formatted_extra_fields))
-                        @foreach($lead->formatted_extra_fields as $fieldLabel => $fieldValue)
-                            <div class="flex justify-between items-start group gap-3">
-                                <span class="text-xs text-gray-500 dark:text-gray-400 shrink-0">{{ $fieldLabel }}</span>
-                                <span
-                                    class="text-sm font-medium text-gray-800 dark:text-gray-200 text-right break-words">{{ $fieldValue !== '' ? $fieldValue : '-' }}</span>
-                            </div>
-                        @endforeach
-                    @endif
-                    <div class="flex justify-between items-center group">
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Created</span>
-                        <span
-                            class="text-sm font-medium text-gray-800 dark:text-gray-200 text-right">{{ $lead->created_at->format('M d, Y') }}</span>
-                    </div>
-                </div>
+                    </span>
+                </button>
+            </div>
 
-                <!-- Delete Button Area -->
-                <div
-                    class="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl flex justify-center">
-                    @if(!$lead->isConverted() && $lead->status !== 'lost')
-                        <form action="{{ route('leads.convert', $lead) }}" method="POST" class="w-full mb-2"
-                            onsubmit="return confirm('Convert this lead to customer?');">
-                            @csrf
-                            <button type="submit"
-                                class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors mb-2">
-                                Convert to Customer
-                            </button>
-                        </form>
-                    @endif
-
-                    <form action="{{ route('leads.destroy', $lead) }}" method="POST" class="w-full"
-                        onsubmit="return confirm('Are you sure you want to delete this lead?');">
+            <!-- Delete Button Area -->
+            <div
+                class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 flex justify-center">
+                @if(!$lead->isConverted() && $lead->status !== 'lost')
+                    <form action="{{ route('leads.convert', $lead) }}" method="POST" class="w-full mb-2"
+                        onsubmit="return confirm('Convert this lead to customer?');">
                         @csrf
-                        @method('DELETE')
                         <button type="submit"
-                            class="w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded-lg text-sm font-semibold transition-colors">
-                            Delete Lead
+                            class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors mb-2">
+                            Convert to Customer
                         </button>
                     </form>
-                </div>
+                @endif
+
+                <form action="{{ route('leads.destroy', $lead) }}" method="POST" class="w-full"
+                    onsubmit="return confirm('Are you sure you want to delete this lead?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit"
+                        class="w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        Delete Lead
+                    </button>
+                </form>
             </div>
 
             <!-- Quick Note for Sidebar (optional, keeping it in main for now) -->
@@ -186,7 +247,7 @@
                 class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                 <div class="flex items-center text-sm font-medium overflow-x-auto scrollbar-hide">
                     @php
-                        $stages = ['new', 'contacted', 'interested', 'qualified', 'converted', 'lost'];
+                        $stages = ['new', 'contacted', 'follow_up', 'qualified', 'converted', 'won', 'lost'];
                         $currentStageIndex = array_search($lead->status, $stages);
                         if ($currentStageIndex === false)
                             $currentStageIndex = -1;
@@ -201,30 +262,31 @@
 
                             $stageColors = [
                                 'new' => 'bg-blue-500 text-white',
-                                'contacted' => 'bg-indigo-500 text-white',
-                                'interested' => 'bg-cyan-500 text-white',
+                                'contacted' => 'bg-cyan-500 text-white',
+                                'follow_up' => 'bg-amber-500 text-white',
                                 'qualified' => 'bg-purple-500 text-white',
-                                'converted' => 'bg-green-500 text-white',
-                                'lost' => 'bg-red-500 text-white',
+                                'converted' => 'bg-emerald-500 text-white',
+                                'won' => 'bg-emerald-600 text-white',
+                                'lost' => 'bg-rose-500 text-white',
                             ];
 
                             if ($lead->status === 'lost') {
-                                $colorClass = 'bg-red-500 text-white';
+                                $colorClass = 'bg-rose-500 text-white';
                             } else {
                                 $activeColor = $stageColors[$stage] ?? 'bg-gray-500 text-white';
                                 $colorClass = $isActive ? $activeColor : $baseColor;
                             }
-                            $isClickable = !$isCurrent && $stage !== 'converted';
+                            $isClickable = !$isCurrent;
                         @endphp
 
                         @if($isClickable)
-                            <form action="{{ route('leads.update', $lead) }}" method="POST" class="flex-1 flex min-w-[100px]">
+                            <form action="{{ route('leads.status.update', $lead) }}" method="POST" class="flex-1 flex min-w-[100px]">
                                 @csrf
                                 @method('PATCH')
                                 <input type="hidden" name="status" value="{{ $stage }}">
                                 <button type="submit"
                                     class="w-full relative py-3 px-4 text-center {{ $colorClass }} {{ $index !== 0 ? 'border-l border-white dark:border-gray-800' : '' }} hover:opacity-90 transition-opacity">
-                                    {{ ucfirst($stage) }}
+                                    {{ ucfirst(str_replace('_', ' ', $stage)) }}
                                 </button>
                             </form>
                         @else
@@ -259,6 +321,10 @@
                         <button onclick="switchTab('followups')" id="tab-followups"
                             class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300">
                             Follow Ups
+                        </button>
+                        <button onclick="switchTab('status-logs')" id="tab-status-logs"
+                            class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300">
+                            Status Audit Trail ({{ $lead->statusLogs->count() }})
                         </button>
                     </nav>
                 </div>
@@ -394,15 +460,48 @@
                                     </div>
                                     <div>
                                         <label for="followup_type" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Type</label>
-                                        <select name="followup_type" id="followup_type"
+                                        <select name="followup_type" id="followup_type" onchange="toggleShowMeetingFields(this.value)"
                                             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2.5 text-sm text-gray-700 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                                            <option value="call">📞 Call</option>
-                                            <option value="meeting">🤝 Meeting</option>
+                                            <option value="call">📞 Phone Call</option>
+                                            <option value="meeting">🤝 Online Meeting (Auto-Generates Link)</option>
                                         </select>
                                     </div>
                                 </div>
+
+                                <div id="meeting-fields-box" class="hidden space-y-4 mb-4 p-4 rounded-lg bg-blue-50/70 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="meeting_platform" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Meeting Platform</label>
+                                            <select name="meeting_platform" id="meeting_platform"
+                                                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2 text-sm text-gray-700 dark:text-gray-200">
+                                                <option value="jitsi">Jitsi Meet (Instant room - no login required)</option>
+                                                <option value="meet">Google Meet</option>
+                                                <option value="zoom">Zoom</option>
+                                                <option value="custom">Custom URL</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="meeting_link" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Custom Link <span class="text-xs text-gray-400 font-normal">(Leave blank to auto-generate)</span></label>
+                                            <input type="url" name="meeting_link" id="meeting_link" placeholder="https://..."
+                                                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2 text-sm text-gray-700 dark:text-gray-200">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label for="agenda" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Meeting Agenda / Objectives</label>
+                                        <input type="text" name="agenda" id="agenda" placeholder="e.g. Product Demo and Pricing Discussion"
+                                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2 text-sm text-gray-700 dark:text-gray-200">
+                                    </div>
+                                    <div class="flex items-center gap-2 pt-1">
+                                        <input type="checkbox" name="send_email_to_lead" id="send_email_to_lead" value="1" checked
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <label for="send_email_to_lead" class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                            Send calendar invitation email with meeting link to <strong>{{ $lead->email }}</strong>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div class="mb-4">
-                                    <label for="followup_description" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Description</label>
+                                    <label for="followup_description" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Notes / Description</label>
                                     <textarea name="description" id="followup_description" placeholder="What is this follow up about?" rows="2"
                                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2.5 text-sm text-gray-700 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"></textarea>
                                 </div>
@@ -414,7 +513,7 @@
                                     </button>
                                     <button type="submit"
                                         class="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors">
-                                        Save Follow Up
+                                        Schedule Follow Up
                                     </button>
                                 </div>
                             </form>
@@ -423,16 +522,17 @@
                         @forelse($lead->followups as $followup)
                             @php
                                 $isCompleted = $followup->status === 'completed';
-                                $isOverdue = !$isCompleted && $followup->isOverdue();
+                                $isCancelled = $followup->status === 'cancelled';
+                                $isOverdue = !$isCompleted && !$isCancelled && $followup->isOverdue();
                             @endphp
                             <div
                                 class="flex items-start gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow">
                                 <div
-                                    class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center {{ $isCompleted ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' : ($isOverdue ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400') }}">
+                                    class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center {{ $isCompleted ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' : ($isCancelled ? 'bg-gray-100 dark:bg-gray-700 text-gray-400' : ($isOverdue ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400')) }}">
                                     @if($followup->followup_type === 'meeting')
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                         </svg>
                                     @else
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,9 +543,16 @@
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex justify-between items-start gap-2">
-                                        <h4 class="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                                            {{ ucfirst($followup->followup_type) }}
-                                        </h4>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <h4 class="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                                                {{ ucfirst($followup->followup_type) }}
+                                            </h4>
+                                            @if($followup->followup_type === 'meeting' && $followup->meeting_platform)
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                                                    {{ strtoupper($followup->meeting_platform) }}
+                                                </span>
+                                            @endif
+                                        </div>
                                         <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap inline-flex items-center gap-1">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -453,28 +560,104 @@
                                             {{ $followup->followup_date->format('M d, Y · h:i A') }}
                                         </span>
                                     </div>
+
+                                    @if($followup->agenda)
+                                        <div class="text-xs font-semibold text-gray-800 dark:text-gray-200 mt-1">
+                                            Agenda: <span class="font-normal">{{ $followup->agenda }}</span>
+                                        </div>
+                                    @endif
+
                                     @if($followup->description)
                                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ $followup->description }}</p>
                                     @endif
-                                    <div class="mt-2.5 flex items-center gap-2">
-                                        @if($isCompleted)
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">✓ Completed</span>
-                                        @elseif($isOverdue)
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">Overdue</span>
-                                        @else
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Pending</span>
-                                        @endif
+
+                                    {{-- Meeting Link Action --}}
+                                    @if($followup->meeting_link)
+                                        <div class="mt-2.5 flex items-center gap-2 flex-wrap p-2.5 rounded-lg bg-indigo-50/60 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40">
+                                            <a href="{{ $followup->meeting_link }}" target="_blank" rel="noopener noreferrer"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                                </svg>
+                                                Join Meeting
+                                            </a>
+                                            <button type="button" onclick="navigator.clipboard.writeText('{{ $followup->meeting_link }}'); alert('Meeting link copied to clipboard!');"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                                </svg>
+                                                Copy Link
+                                            </button>
+                                            <span class="text-[11px] text-gray-500 truncate max-w-xs">{{ $followup->meeting_link }}</span>
+                                        </div>
+                                    @endif
+
+                                    <div class="mt-3 flex items-center justify-between gap-2 flex-wrap">
+                                        <div class="flex items-center gap-2">
+                                            @if($isCompleted)
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">✓ Completed</span>
+                                            @elseif($isCancelled)
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Cancelled</span>
+                                            @elseif($isOverdue)
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">Overdue</span>
+                                            @else
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Scheduled</span>
+                                            @endif
+                                        </div>
+
                                         @if($followup->status === 'pending')
-                                            <form action="{{ route('leads.followups.complete', [$lead, $followup]) }}"
-                                                method="POST">
-                                                @csrf
-                                                <button type="submit"
-                                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-green-900/40 dark:hover:text-green-300 transition-colors">
-                                                    Mark Complete
+                                            <div class="flex items-center gap-2">
+                                                <form action="{{ route('leads.followups.complete', [$lead, $followup]) }}" method="POST">
+                                                    @csrf
+                                                    <button type="submit"
+                                                        class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 transition-colors">
+                                                        Mark Complete
+                                                    </button>
+                                                </form>
+
+                                                <button type="button" onclick="document.getElementById('reschedule-box-{{ $followup->id }}').classList.toggle('hidden')"
+                                                    class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 transition-colors">
+                                                    Reschedule
                                                 </button>
-                                            </form>
+
+                                                <form action="{{ route('leads.followups.cancel', [$lead, $followup]) }}" method="POST"
+                                                    onsubmit="return confirm('Cancel this follow up? A notification email will be sent to the lead.');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                        class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                </form>
+                                            </div>
                                         @endif
                                     </div>
+
+                                    {{-- Quick Reschedule Box --}}
+                                    @if($followup->status === 'pending')
+                                        <div id="reschedule-box-{{ $followup->id }}" class="hidden mt-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                                            <form action="{{ route('leads.followups.reschedule', [$lead, $followup]) }}" method="POST" class="space-y-3">
+                                                @csrf
+                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">New Date &amp; Time</label>
+                                                        <input type="datetime-local" name="followup_date" required value="{{ $followup->followup_date->format('Y-m-d\TH:i') }}"
+                                                            class="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-gray-900 dark:text-white">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">Reschedule Reason (Optional)</label>
+                                                        <input type="text" name="reschedule_reason" placeholder="e.g. Client requested postponement"
+                                                            class="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-gray-900 dark:text-white">
+                                                    </div>
+                                                </div>
+                                                <div class="flex justify-end gap-2">
+                                                    <button type="button" onclick="document.getElementById('reschedule-box-{{ $followup->id }}').classList.add('hidden')"
+                                                        class="text-xs px-3 py-1 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">Close</button>
+                                                    <button type="submit"
+                                                        class="text-xs px-3 py-1 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700">Confirm &amp; Send Update</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         @empty
@@ -491,13 +674,132 @@
                         @endforelse
                     </div>
 
+                    <!-- STATUS AUDIT TRAIL TAB -->
+                    <div id="content-status-logs" class="tab-content hidden space-y-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-bold text-gray-900 dark:text-gray-100">Status Audit Trail</h3>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Every lifecycle transition logged with author, timestamp, and notes</p>
+                            </div>
+                        </div>
+
+                        @forelse($lead->statusLogs as $log)
+                            <div class="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm flex items-start justify-between gap-4">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                                        {{ $log->changer ? substr($log->changer->name, 0, 1) : 'S' }}
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-xs px-2 py-0.5 rounded font-medium {{ $log->from_status ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 line-through' : 'bg-gray-100 dark:bg-gray-700 text-gray-500' }}">
+                                                {{ $log->from_status ?? 'Initial' }}
+                                            </span>
+                                            <span class="text-gray-400">→</span>
+                                            <span class="text-xs px-2 py-0.5 rounded font-bold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                                {{ $log->to_status }}
+                                            </span>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                by <strong class="text-gray-700 dark:text-gray-200">{{ $log->changer->name ?? 'System' }}</strong>
+                                            </span>
+                                        </div>
+                                        @if($log->notes)
+                                            <p class="text-xs text-gray-600 dark:text-gray-300 mt-2 bg-gray-50 dark:bg-gray-700/50 p-2.5 rounded-lg border border-gray-100 dark:border-gray-700">
+                                                {{ $log->notes }}
+                                            </p>
+                                        @endif
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-400 whitespace-nowrap">
+                                    {{ $log->created_at->format('M d, Y · h:i A') }}
+                                </span>
+                            </div>
+                        @empty
+                            <div class="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
+                                No status changes recorded yet.
+                            </div>
+                        @endforelse
+                    </div>
+
                 </div>
             </div>
 
         </div>
     </div>
 
+    {{-- Lead Details Modal: everything the sidebar's About Lead card hides --}}
+    <div id="lead-details-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="lead-details-title"
+        role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onclick="closeLeadDetailsModal()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div
+                class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-2xl transition-all w-full max-w-2xl border border-gray-100 dark:border-gray-700">
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+                        <h3 id="lead-details-title"
+                            class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                    </path>
+                                </svg>
+                            </span>
+                            About {{ $lead->name }}
+                        </h3>
+                        <button type="button" onclick="closeLeadDetailsModal()"
+                            class="text-gray-400 hover:text-gray-500 p-1 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <dl class="divide-y divide-gray-100 dark:divide-gray-700">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-3">
+                            <dt class="text-xs text-gray-500 dark:text-gray-400">Source</dt>
+                            <dd class="text-sm font-medium text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">{{ $lead->source ?? '-' }}</dd>
+                        </div>
+                        @foreach($lead->formatted_extra_fields as $fieldLabel => $fieldValue)
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-3">
+                                <dt class="text-xs text-gray-500 dark:text-gray-400">{{ $fieldLabel }}</dt>
+                                <dd class="text-sm font-medium text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">{{ $fieldValue !== '' ? $fieldValue : '-' }}</dd>
+                            </div>
+                        @endforeach
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-3">
+                            <dt class="text-xs text-gray-500 dark:text-gray-400">Created</dt>
+                            <dd class="text-sm font-medium text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">{{ $lead->created_at->format('M d, Y') }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 flex justify-end">
+                    <button type="button" onclick="closeLeadDetailsModal()"
+                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        function openLeadDetailsModal() {
+            document.getElementById('lead-details-modal').classList.remove('hidden');
+        }
+
+        function closeLeadDetailsModal() {
+            document.getElementById('lead-details-modal').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('lead-details-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeLeadDetailsModal();
+                }
+            }
+        });
+
         function switchTab(tabName) {
             // Hide all contents
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -533,6 +835,17 @@
                     location.reload();
                 }
             }).catch(error => console.error('Error tracking action:', error));
+        }
+
+        function toggleShowMeetingFields(type) {
+            const box = document.getElementById('meeting-fields-box');
+            if (box) {
+                if (type === 'meeting') {
+                    box.classList.remove('hidden');
+                } else {
+                    box.classList.add('hidden');
+                }
+            }
         }
     </script>
 @endsection

@@ -39,12 +39,57 @@ class Department extends Model
         'name',
         'description',
         'manager_id',
+        'designations',
         'is_active',
     ];
 
     protected $casts = [
+        'designations' => 'array',
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Normalized list of designations [slug => Label] for this department.
+     * Always ensures 'manager' => 'Manager' is included.
+     *
+     * @return array<string, string>
+     */
+    public function parsedDesignations(): array
+    {
+        $raw = $this->designations;
+        $result = [];
+
+        if (is_array($raw)) {
+            foreach ($raw as $key => $val) {
+                if (is_string($key) && ! is_numeric($key)) {
+                    $slug = strtolower(trim($key));
+                    $label = trim((string) $val);
+                } else {
+                    $label = trim((string) $val);
+                    $slug = strtolower($label);
+                }
+                if ($slug !== '') {
+                    $result[$slug] = $label ?: ucwords($slug);
+                }
+            }
+        } elseif (is_string($raw) && trim($raw) !== '') {
+            $parts = explode(',', $raw);
+            foreach ($parts as $p) {
+                $label = trim($p);
+                $slug = strtolower($label);
+                if ($slug !== '') {
+                    $result[$slug] = $label;
+                }
+            }
+        }
+
+        // Always ensure 'manager' => 'Manager' is present
+        if (! isset($result['manager'])) {
+            $result = array_merge(['manager' => 'Manager'], $result);
+        }
+
+        return $result;
+    }
 
     /**
      * Bind by name in the URL rather than by id.
@@ -89,7 +134,10 @@ class Department extends Model
             ->active()
             ->where(function ($query) {
                 $query->whereHas('roles', fn ($roles) => $roles->where('name', Rbac::ADMIN_ROLE))
-                    ->orWhereHas('roles', fn ($roles) => $roles->where('name', 'manager'));
+                    ->orWhereHas('roles', fn ($roles) => $roles->where('name', 'manager')->orWhere('name', 'like', '%_manager'))
+                    ->orWhere('role', Rbac::ADMIN_ROLE)
+                    ->orWhere('role', 'manager')
+                    ->orWhere('role', 'like', '%_manager');
             })
             ->when($exceptUserId, fn ($query) => $query->whereKeyNot($exceptUserId))
             ->orderBy('name')

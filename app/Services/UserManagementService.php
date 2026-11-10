@@ -51,7 +51,7 @@ class UserManagementService
      */
     public function assignRole(User $user, string $roleName): void
     {
-        if (! array_key_exists($roleName, array_flip(Rbac::ROLES))) {
+        if (! in_array($roleName, Rbac::ROLES, true) && ! \Spatie\Permission\Models\Role::where('name', $roleName)->where('guard_name', Rbac::GUARD)->exists()) {
             throw new \InvalidArgumentException("Unknown role [{$roleName}].");
         }
 

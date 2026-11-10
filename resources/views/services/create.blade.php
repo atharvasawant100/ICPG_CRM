@@ -4,121 +4,198 @@
 @section('page-title', 'Create Service')
 
 @section('content')
-    <div
-        class="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8 border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Create New Service</h2>
+<div class="w-full">
+
+    <!-- Single Full-Width Card Container matching Standard Form UI -->
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-700 p-6 sm:p-8 md:p-10 transition-colors duration-200">
+
+        <!-- Header Inside the Container with Breadcrumbs -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-gray-100 dark:border-gray-700/80">
+            <div>
+                <div class="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    <a href="{{ route('services.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Services</a>
+                    <span>/</span>
+                    <span class="text-blue-600 dark:text-blue-400 font-semibold">New Service</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Add New Service</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Define services, standard billing rates, and recurrence intervals for invoices.
+                </p>
+            </div>
+
+            <a href="{{ route('services.index') }}"
+                class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 transition-colors self-start sm:self-auto">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Services
+            </a>
         </div>
 
-        @if($errors->any())
-            <div
-                class="mb-4 bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg shadow-sm">
-                <ul class="list-disc list-inside text-sm">
-                    @foreach($errors->all() as $error)
-                        <li class="font-medium">{{ $error }}</li>
-                    @endforeach
-                </ul>
+        {{-- Validation Errors --}}
+        @if ($errors->any())
+            <div class="mb-8 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 rounded-xl p-4">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-bold text-red-800 dark:text-red-200">Please correct the following errors:</h3>
+                        <ul class="text-xs text-red-700 dark:text-red-300 list-disc list-inside space-y-0.5">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
             </div>
         @endif
 
-        <form method="POST" action="{{ route('services.store') }}">
+        <!-- Form Elements -->
+        <form method="POST" action="{{ route('services.store') }}" class="space-y-7">
             @csrf
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- 2-Column Responsive Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                 <!-- Service Name -->
                 <div>
-                    <label for="name" class="block text-gray-700 text-sm font-semibold mb-2 dark:text-gray-300">Service Name
-                        <span class="text-red-500">*</span></label>
-                    <input type="text" name="name" id="name" value="{{ old('name') }}" required
-                        placeholder="e.g., Website Development, SEO Services"
-                        class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-2.5 px-4 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-gray-400">
+                    <label for="name" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Service Name <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                        </div>
+                        <input type="text" name="name" id="name" value="{{ old('name') }}" required
+                            placeholder="e.g. Website Development, SEO Retainer"
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 @error('name') border-red-500 @enderror">
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">Official name of the deliverable or retainer package</p>
                 </div>
 
                 <!-- Rate -->
                 <div>
-                    <label for="rate" class="block text-gray-700 text-sm font-semibold mb-2 dark:text-gray-300">Rate (₹)
-                        <span class="text-red-500">*</span></label>
-                    <input type="number" name="rate" id="rate" value="{{ old('rate') }}" step="0.01" min="0" required
-                        placeholder="0.00"
-                        class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-2.5 px-4 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-gray-400">
+                    <label for="rate" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Billing Rate (₹) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <span class="text-sm font-bold text-gray-400">₹</span>
+                        </div>
+                        <input type="number" name="rate" id="rate" value="{{ old('rate') }}" step="0.01" min="0" required
+                            placeholder="0.00"
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 @error('rate') border-red-500 @enderror">
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">Default price in INR excluding taxes</p>
                 </div>
 
                 <!-- Frequency -->
                 <div>
-                    <label for="frequency"
-                        class="block text-gray-700 text-sm font-semibold mb-2 dark:text-gray-300">Frequency <span
-                            class="text-red-500">*</span></label>
-                    <select name="frequency" id="frequency" required onchange="toggleCustomInterval()"
-                        class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-2.5 px-4 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-gray-400">
-                        <option value="one-time" {{ old('frequency') === 'one-time' ? 'selected' : '' }}>One Time</option>
-                        <option value="weekly" {{ old('frequency') === 'weekly' ? 'selected' : '' }}>Weekly</option>
-                        <option value="monthly" {{ old('frequency', 'monthly') === 'monthly' ? 'selected' : '' }}>Monthly
-                        </option>
-                        <option value="quarterly" {{ old('frequency') === 'quarterly' ? 'selected' : '' }}>Quarterly</option>
-                        <option value="yearly" {{ old('frequency') === 'yearly' ? 'selected' : '' }}>Yearly</option>
-                        <option value="custom" {{ old('frequency') === 'custom' ? 'selected' : '' }}>Custom</option>
-                    </select>
+                    <label for="frequency" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Billing Frequency <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <select name="frequency" id="frequency" required onchange="toggleCustomInterval()"
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-pointer @error('frequency') border-red-500 @enderror">
+                            <option value="one-time" {{ old('frequency') === 'one-time' ? 'selected' : '' }}>One Time</option>
+                            <option value="weekly" {{ old('frequency') === 'weekly' ? 'selected' : '' }}>Weekly</option>
+                            <option value="monthly" {{ old('frequency', 'monthly') === 'monthly' ? 'selected' : '' }}>Monthly</option>
+                            <option value="quarterly" {{ old('frequency') === 'quarterly' ? 'selected' : '' }}>Quarterly</option>
+                            <option value="yearly" {{ old('frequency') === 'yearly' ? 'selected' : '' }}>Yearly</option>
+                            <option value="custom" {{ old('frequency') === 'custom' ? 'selected' : '' }}>Custom Interval</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">Determines how often the recurring billing triggers</p>
                 </div>
 
-                <!-- Custom Interval Days (only shown when frequency is custom) -->
-                <div id="custom_interval_container"
-                    style="display: {{ old('frequency') === 'custom' ? 'block' : 'none' }};">
-                    <label for="custom_interval_days"
-                        class="block text-gray-700 text-sm font-semibold mb-2 dark:text-gray-300">Interval (Days) <span
-                            class="text-red-500">*</span></label>
-                    <input type="number" name="custom_interval_days" id="custom_interval_days"
-                        value="{{ old('custom_interval_days', 30) }}" min="1" placeholder="e.g., 30"
-                        class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-2.5 px-4 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-gray-400">
+                <!-- Custom Interval Days (conditional) -->
+                <div id="custom_interval_container" style="display: {{ old('frequency') === 'custom' ? 'block' : 'none' }};">
+                    <label for="custom_interval_days" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Interval (Days) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <input type="number" name="custom_interval_days" id="custom_interval_days"
+                            value="{{ old('custom_interval_days', 30) }}" min="1" placeholder="e.g. 30"
+                            class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400">
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">Number of days between billing cycles</p>
                 </div>
 
                 <!-- Active Status -->
-                <div>
-                    <label class="flex items-center cursor-pointer">
-                        <input type="checkbox" name="is_active" value="1" id="is_active" {{ old('is_active', true) ? 'checked' : '' }}
-                            class="mr-3 rounded border-gray-300 text-gray-600 focus:ring-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:checked:bg-blue-600">
-                        <span class="text-gray-700 font-semibold dark:text-gray-300">Active Service</span>
+                <div class="md:col-span-2 pt-2">
+                    <label for="is_active" class="inline-flex items-center gap-3 cursor-pointer">
+                        <input type="hidden" name="is_active" value="0">
+                        <input type="checkbox" name="is_active" id="is_active" value="1"
+                            @checked(old('is_active', true))
+                            class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Active Service</span>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Only active services can be selected when creating invoices and recurring subscriptions</p>
+                        </div>
                     </label>
-                    <p class="text-xs text-gray-500 mt-1 ml-6 dark:text-gray-400">Only active services will appear in
-                        invoice creation</p>
+                </div>
+
+                <!-- Description -->
+                <div class="md:col-span-2">
+                    <label for="description" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                        Description
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <textarea name="description" id="description" rows="4"
+                            placeholder="Describe the service scope, features, and billing notes..."
+                            class="w-full p-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400">{{ old('description') }}</textarea>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">Will be included in client proposals and invoice line item descriptions</p>
+                </div>
+
+            </div>
+
+            <!-- Bottom Action Bar -->
+            <div class="pt-6 border-t border-gray-100 dark:border-gray-700/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <a href="{{ route('services.index') }}"
+                    class="text-sm font-semibold text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors order-2 sm:order-1">
+                    Cancel
+                </a>
+                <div class="flex items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
+                    <button type="submit"
+                        class="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] text-center">
+                        Create Service
+                    </button>
                 </div>
             </div>
 
-            <!-- Description -->
-            <div class="mb-6">
-                <label for="description"
-                    class="block text-gray-700 text-sm font-semibold mb-2 dark:text-gray-300">Description</label>
-                <textarea name="description" id="description" rows="4" placeholder="Describe the service in detail..."
-                    class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-2.5 px-4 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-gray-400">{{ old('description') }}</textarea>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="flex gap-4">
-                <button type="submit"
-                    class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition-all duration-200 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-500 dark:hover:to-blue-600">
-                    Create Service
-                </button>
-                <a href="{{ route('services.index') }}"
-                    class="bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-6 py-2.5 rounded-lg font-semibold transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500">
-                    Cancel
-                </a>
-            </div>
         </form>
+
     </div>
+</div>
 
-    <script>
-        function toggleCustomInterval() {
-            const frequency = document.getElementById('frequency').value;
-            const container = document.getElementById('custom_interval_container');
-            const input = document.getElementById('custom_interval_days');
+<script>
+    function toggleCustomInterval() {
+        const frequency = document.getElementById('frequency').value;
+        const container = document.getElementById('custom_interval_container');
+        const input = document.getElementById('custom_interval_days');
 
-            if (frequency === 'custom') {
-                container.style.display = 'block';
-                input.required = true;
-            } else {
-                container.style.display = 'none';
-                input.required = false;
-                input.value = '';
-            }
+        if (frequency === 'custom') {
+            container.style.display = 'block';
+            input.required = true;
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = '';
         }
-    </script>
+    }
+</script>
 @endsection

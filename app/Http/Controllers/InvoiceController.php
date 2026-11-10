@@ -36,7 +36,11 @@ class InvoiceController extends Controller
 
         // Apply filters
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            if ($request->status === 'overdue') {
+                $query->overdue();
+            } else {
+                $query->where('status', $request->status);
+            }
         }
 
         if ($request->filled('customer_id')) {
@@ -112,25 +116,24 @@ class InvoiceController extends Controller
         // Generate invoice number
         $invoiceNumber = InvoiceNumberGenerator::generate();
 
-        // Calculate totals if not provided
+        // Calculate totals authoritatively
         $items = $data['items'] ?? [];
-        if (!isset($data['subtotal']) || !isset($data['total_amount'])) {
-            $subtotal = 0;
-            foreach ($items as $item) {
-                $itemTotal = ($item['quantity'] ?? 0) * ($item['unit_price'] ?? 0);
-                $subtotal += $itemTotal;
-            }
-            $data['subtotal'] = $subtotal;
-            $data['tax_amount'] = $data['tax_amount'] ?? 0;
-            $data['discount_amount'] = $data['discount_amount'] ?? 0;
-            $data['total_amount'] = $subtotal + $data['tax_amount'] - $data['discount_amount'];
+        $subtotal = 0;
+        foreach ($items as $item) {
+            $itemTotal = ($item['quantity'] ?? 0) * ($item['unit_price'] ?? 0);
+            $subtotal += $itemTotal;
         }
+        $data['subtotal'] = $subtotal;
+        $data['tax_amount'] = (float) ($data['tax_amount'] ?? 0);
+        $data['discount_amount'] = (float) ($data['discount_amount'] ?? 0);
+        $data['total_amount'] = max(0, $subtotal + $data['tax_amount'] - $data['discount_amount']);
 
         DB::beginTransaction();
         try {
             $invoice = Invoice::create([
                 'invoice_number' => $invoiceNumber,
                 'customer_id' => $data['customer_id'],
+                'brand' => $data['brand'] ?? null,
                 // 'department_id' => null, // Removed
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'],
@@ -178,6 +181,7 @@ class InvoiceController extends Controller
                 $recurringTemplate = RecurringInvoiceTemplate::create([
                     'name' => $templateName,
                     'customer_id' => $data['customer_id'],
+                    'brand' => $data['brand'] ?? null,
                     // 'department_id' => null, // Removed
                     'frequency' => $frequency,
                     'custom_interval_days' => ($frequency === 'custom') ? $customIntervalDays : null,
@@ -288,24 +292,27 @@ class InvoiceController extends Controller
 
         $data = $request->validated();
 
-        // Calculate totals if not provided
+        // Read before the update: deciding whether this is an "approval" needs
+        // to know where the invoice came from, not where it ends up.
+        $wasAlreadySent = $invoice->status !== 'draft';
+
+        // Calculate totals authoritatively
         $items = $data['items'] ?? [];
-        if (!isset($data['subtotal']) || !isset($data['total_amount'])) {
-            $subtotal = 0;
-            foreach ($items as $item) {
-                $itemTotal = ($item['quantity'] ?? 0) * ($item['unit_price'] ?? 0);
-                $subtotal += $itemTotal;
-            }
-            $data['subtotal'] = $subtotal;
-            $data['tax_amount'] = $data['tax_amount'] ?? 0;
-            $data['discount_amount'] = $data['discount_amount'] ?? 0;
-            $data['total_amount'] = $subtotal + $data['tax_amount'] - $data['discount_amount'];
+        $subtotal = 0;
+        foreach ($items as $item) {
+            $itemTotal = ($item['quantity'] ?? 0) * ($item['unit_price'] ?? 0);
+            $subtotal += $itemTotal;
         }
+        $data['subtotal'] = $subtotal;
+        $data['tax_amount'] = (float) ($data['tax_amount'] ?? 0);
+        $data['discount_amount'] = (float) ($data['discount_amount'] ?? 0);
+        $data['total_amount'] = max(0, $subtotal + $data['tax_amount'] - $data['discount_amount']);
 
         DB::beginTransaction();
         try {
             $invoice->update([
                 'customer_id' => $data['customer_id'],
+                'brand' => $data['brand'] ?? null,
                 // 'department_id' => $data['department_id'], // Removed
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'],
@@ -347,8 +354,25 @@ class InvoiceController extends Controller
 
             DB::commit();
 
+            /*
+             | Moving an invoice out of draft is an approval, and an approval
+             | means the customer gets the invoice. Queued rather than sent
+             | inline so a slow SMTP host cannot roll back the edit the user
+             | just made — a failure shows up on the Email Log page instead.
+             */
+            $emailQueued = false;
+
+            if (! $wasAlreadySent && $invoice->status === 'sent') {
+                try {
+                    $emailQueued = (new InvoiceEmailService)->queueInvoice($invoice, true, Auth::id()) !== null;
+                } catch (\Throwable $e) {
+                    // The edit already committed; do not pretend it failed.
+                    report($e);
+                }
+            }
+
             return redirect()->route('invoices.show', $invoice)
-                ->with('success', 'Invoice updated successfully.');
+                ->with('success', 'Invoice updated successfully.' . ($emailQueued ? ' Invoice email queued for the customer.' : ''));
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withInput()
@@ -396,7 +420,12 @@ class InvoiceController extends Controller
             return back()->with('error', 'Cannot send invoice with status: ' . $invoice->status);
         }
 
-        $shouldSendEmail = $request->has('send_email') && $request->boolean('send_email');
+        /*
+         | Sending an invoice now emails it by default. The only way to skip
+         | the email is to say so explicitly (send_email=0), which is what the
+         | "Mark as Sent" button posts.
+         */
+        $shouldSendEmail = $request->boolean('send_email', true);
 
         // Mark as sent if needed (but still allow re-sending emails anytime)
         if ($invoice->status === 'draft') {
@@ -404,36 +433,34 @@ class InvoiceController extends Controller
             $invoice->save();
         }
 
-        // Send email if requested
-        if ($shouldSendEmail) {
-            try {
-                $emailService = new InvoiceEmailService();
-                $emailService->sendInvoice($invoice, true);
-
-                // Track email sends (count + latest timestamp)
-                $invoice->forceFill([
-                    'email_sent_at' => now(),
-                    'email_sent_count' => (int) ($invoice->email_sent_count ?? 0) + 1,
-                ])->save();
-
-                return back()
-                    ->with('success', 'Invoice email sent to customer.')
-                    ->with('invoice_email_popup', ['type' => 'success', 'message' => 'Email sent successfully to customer.']);
-            } catch (\Throwable $e) {
-                $errMsg = $e->getMessage();
-                return back()
-                    ->with('error', 'Email failed: ' . $errMsg)
-                    ->with('invoice_email_popup', ['type' => 'error', 'message' => 'Email failed: ' . $errMsg]);
-            }
+        if (! $shouldSendEmail) {
+            return back()->with('success', 'Invoice marked as sent. No email was sent.');
         }
 
-        // Mark as sent button (no email)
-        if ($invoice->status !== 'sent') {
-            $invoice->status = 'sent';
-            $invoice->save();
+        try {
+            $log = (new InvoiceEmailService)->queueInvoice($invoice, true, Auth::id());
+        } catch (\Throwable $e) {
+            $errMsg = $e->getMessage();
+
+            return back()
+                ->with('error', 'Email could not be queued: ' . $errMsg)
+                ->with('invoice_email_popup', ['type' => 'error', 'message' => 'Email could not be queued: ' . $errMsg]);
         }
 
-        return back()->with('success', 'Invoice marked as sent.');
+        // No address on file is a data problem, not a crash: the invoice is
+        // still marked sent and the user is told exactly why nothing arrived.
+        if ($log === null) {
+            return back()
+                ->with('error', 'Invoice marked as sent, but no email was sent: the customer has no email address.')
+                ->with('invoice_email_popup', ['type' => 'error', 'message' => 'Customer has no email address on file.']);
+        }
+
+        return back()
+            ->with('success', 'Invoice marked as sent. Email queued for ' . $log->recipient_email . '.')
+            ->with('invoice_email_popup', [
+                'type' => 'success',
+                'message' => 'Invoice email queued for ' . $log->recipient_email . '. Delivery happens in the background.',
+            ]);
     }
 
     /**
@@ -483,6 +510,14 @@ class InvoiceController extends Controller
 
         $pdf = PdfFacade::setOptions($options)->loadView('invoices.pdf', compact('invoice'));
 
-        return $pdf->download($invoice->getPdfFilename());
+        $filename = $invoice->getPdfFilename();
+        $output = $pdf->output();
+
+        return response($output, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename),
+            'Content-Length' => strlen($output),
+            'Cache-Control' => 'no-cache, private',
+        ]);
     }
 }

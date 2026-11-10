@@ -351,6 +351,9 @@
                 <td style="width: 55%; vertical-align: top; padding-right: 25px;">
                     <div class="section-label">Bill To</div>
                     <div class="client-name">{{ $invoice->customer->name }}</div>
+                    @if($invoice->brand)
+                        <div class="client-info" style="font-weight: bold; color: #1e3a8a;">Brand: {{ $invoice->brand }}</div>
+                    @endif
                     @if($invoice->customer->company)
                         <div class="client-info">{{ $invoice->customer->company }}</div>
                     @endif
@@ -360,6 +363,12 @@
                 <td style="width: 45%; vertical-align: top;">
                     <div class="section-label">Invoice Details</div>
                     <div class="details-box">
+                        @if($invoice->brand)
+                            <div class="detail-row clearfix">
+                                <span class="detail-label">Brand:</span>
+                                <span class="detail-value">{{ $invoice->brand }}</span>
+                            </div>
+                        @endif
                         <div class="detail-row clearfix">
                             <span class="detail-label">Invoice Date:</span>
                             <span class="detail-value">{{ $invoice->invoice_date->format('d M, Y') }}</span>

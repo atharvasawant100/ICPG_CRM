@@ -105,7 +105,15 @@ final class DataScope
         $resolved = config('rbac.default_scope', self::OWN);
         $best = $rank[$resolved] ?? 1;
 
-        foreach ($user->getRoleNames() as $role) {
+        $roles = $user->getRoleNames()->all();
+        if ($user->isManager() && ! empty($user->department)) {
+            $deptRole = strtolower((string) $user->department);
+            if (! in_array($deptRole, $roles, true)) {
+                $roles[] = $deptRole;
+            }
+        }
+
+        foreach ($roles as $role) {
             // DB first, config as fallback (see scopeForRole()).
             $scope = self::scopeForRole($role, $module);
 
@@ -162,6 +170,54 @@ final class DataScope
             return $query;
         }
 
+        // Special scoping for leads: sales employees work on assigned leads; managers oversee their team's leads
+        if ($module === 'leads') {
+            if ($scope === self::TEAM && $user !== null) {
+                $teamIds = self::teamIds($user);
+                return $query->where(function ($q) use ($teamIds) {
+                    $q->whereIn('leads.assigned_to', $teamIds)
+                        ->orWhereIn('leads.created_by', $teamIds);
+                });
+            }
+
+            if ($user === null) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function ($q) use ($user) {
+                $q->where('leads.assigned_to', $user->id)
+                    ->orWhere(function ($q2) use ($user) {
+                        $q2->whereNull('leads.assigned_to')
+                            ->where('leads.created_by', $user->id);
+                    });
+            });
+        }
+
+        // Special scoping for followups: scoped by user_id or lead's assigned_to
+        if ($module === 'followups') {
+            if ($scope === self::TEAM && $user !== null) {
+                $teamIds = self::teamIds($user);
+                return $query->where(function ($q) use ($teamIds, $user) {
+                    $q->whereIn('lead_followups.user_id', $teamIds)
+                        ->orWhereHas('lead', function ($lq) use ($teamIds, $user) {
+                            $lq->whereIn('assigned_to', $teamIds)
+                                ->orWhere('created_by', $user->id);
+                        });
+                });
+            }
+
+            if ($user === null) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function ($q) use ($user) {
+                $q->where('lead_followups.user_id', $user->id)
+                    ->orWhereHas('lead', function ($lq) use ($user) {
+                        $lq->where('assigned_to', $user->id);
+                    });
+            });
+        }
+
         // Qualify the column so joins cannot make it ambiguous.
         $qualified = $query->getModel()->qualifyColumn($column);
 
@@ -197,6 +253,39 @@ final class DataScope
         }
 
         if ($user === null) {
+            return false;
+        }
+
+        if ($module === 'leads') {
+            if ($scope === self::TEAM) {
+                $teamIds = array_map('intval', self::teamIds($user));
+                return in_array((int) $record->assigned_to, $teamIds, true)
+                    || in_array((int) $record->created_by, $teamIds, true);
+            }
+
+            return (int) $record->assigned_to === (int) $user->id
+                || ((int) $record->created_by === (int) $user->id && empty($record->assigned_to));
+        }
+
+        if ($module === 'followups') {
+            if ((int) $record->user_id === (int) $user->id) {
+                return true;
+            }
+
+            $lead = $record->relationLoaded('lead') ? $record->lead : $record->lead()->first();
+            if ($lead) {
+                if ($scope === self::TEAM) {
+                    $teamIds = array_map('intval', self::teamIds($user));
+                    return in_array((int) $lead->assigned_to, $teamIds, true)
+                        || (int) $lead->created_by === (int) $user->id;
+                }
+                return (int) $lead->assigned_to === (int) $user->id;
+            }
+
+            if ($scope === self::TEAM) {
+                return in_array((int) $record->user_id, array_map('intval', self::teamIds($user)), true);
+            }
+
             return false;
         }
 

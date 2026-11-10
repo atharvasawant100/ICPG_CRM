@@ -22,7 +22,7 @@ class LeadsImport implements OnEachRow, WithHeadingRow, SkipsEmptyRows
         'status' => ['status', 'lead_status'],
     ];
 
-    protected const ALLOWED_STATUSES = ['new', 'contacted', 'interested', 'qualified', 'converted', 'lost'];
+    protected const ALLOWED_STATUSES = ['new', 'contacted', 'follow_up', 'interested', 'qualified', 'converted', 'won', 'lost'];
 
     protected int $successCount = 0;
 

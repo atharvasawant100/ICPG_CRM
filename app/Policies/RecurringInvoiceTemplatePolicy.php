@@ -43,4 +43,10 @@ class RecurringInvoiceTemplatePolicy extends BasePolicy
     {
         return $this->permittedFor($user, 'recurring_invoices.toggle', $template, 'recurring_invoices');
     }
+
+    /** Manually generate an invoice from a template. */
+    public function generate(User $user, RecurringInvoiceTemplate $template): bool
+    {
+        return $this->permittedFor($user, 'recurring_invoices.edit', $template, 'recurring_invoices');
+    }
 }

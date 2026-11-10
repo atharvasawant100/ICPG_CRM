@@ -53,3 +53,58 @@ Schedule::command('invoices:send-overdue-reminders')
             'action_required' => 'Check logs and run manually: php artisan invoices:send-overdue-reminders'
         ]);
     });
+
+// Schedule auto punch-out for unclosed shifts daily at 23:50 IST
+Schedule::command('attendance:auto-punch-out')
+    ->dailyAt('23:50')
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(10)
+    ->runInBackground()
+    ->onSuccess(function () {
+        \Illuminate\Support\Facades\Log::info('✅ Unclosed employee shifts auto-clocked out', [
+            'timestamp' => now(),
+            'schedule' => 'daily_2350'
+        ]);
+    })
+    ->onFailure(function () {
+        \Illuminate\Support\Facades\Log::error('❌ Attendance auto punch-out job failed', [
+            'timestamp' => now(),
+            'schedule' => 'daily_2350'
+        ]);
+    });
+
+// Schedule auto-marking absents for unpunched employees daily at 23:59 IST
+Schedule::command('attendance:mark-absents')
+    ->dailyAt('23:59')
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(10)
+    ->runInBackground()
+    ->onSuccess(function () {
+        \Illuminate\Support\Facades\Log::info('✅ Unpunched employee attendance auto-marked as absent/holiday', [
+            'timestamp' => now(),
+            'schedule' => 'daily_2359'
+        ]);
+    })
+    ->onFailure(function () {
+        \Illuminate\Support\Facades\Log::error('❌ Attendance auto-absent job failed', [
+            'timestamp' => now(),
+            'schedule' => 'daily_2359'
+        ]);
+    });
+
+// Schedule task deadline checks and missed task threshold notifications
+Schedule::command('tasks:check-overdue')
+    ->hourly()
+    ->between('09:00', '20:00')
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
+// Schedule check for missed social media content publishing schedules
+Schedule::command('content:check-missed-schedules')
+    ->everyFifteenMinutes()
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
+

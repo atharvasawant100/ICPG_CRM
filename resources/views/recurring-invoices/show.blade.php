@@ -10,6 +10,21 @@
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Created on {{ $template->created_at->format('M d, Y') }}</p>
         </div>
         <div class="flex gap-2 flex-wrap">
+            @if($template->is_active)
+                @can('recurring_invoices.edit')
+                    <form action="{{ route('recurring-invoices.generate', $template) }}" method="POST" class="inline"
+                        onsubmit="return confirm('Generate an invoice immediately from this template and email it to the customer?');">
+                        @csrf
+                        <button type="submit"
+                            class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            <span>Generate Invoice Now</span>
+                        </button>
+                    </form>
+                @endcan
+            @endif
             <a href="{{ route('recurring-invoices.edit', $template) }}"
                 class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
                 Edit
@@ -221,8 +236,4 @@
         </div>
     @endif
 
-    <div class="mt-6">
-        <a href="{{ route('recurring-invoices.index') }}"
-            class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium transition-colors">← Back to Templates</a>
-    </div>
 @endsection

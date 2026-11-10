@@ -17,9 +17,10 @@ class Expense extends Model
     /** Audit module label. */
     protected $auditModule = 'expenses';
 
-        protected $fillable = [
+    protected $fillable = [
         'user_id',
         'category_id',
+        'ai_tool',
         'amount',
         'description',
         'expense_date',

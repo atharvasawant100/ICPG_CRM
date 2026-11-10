@@ -29,17 +29,26 @@ if (!$invoice->customer->email) {
     exit(1);
 }
 
-echo "=== Sending Email ===\n";
+echo "=== Queueing Email ===\n";
 
 try {
     $emailService = new InvoiceEmailService();
-    $emailService->sendInvoice($invoice, true);
+    $log = $emailService->queueInvoice($invoice, true);
 
-    echo "✅ Email sent successfully!\n";
-    echo "Recipient: {$invoice->customer->email}\n";
-    echo "Check inbox (and spam folder)\n";
+    if ($log === null) {
+        echo "⚠️  Nothing queued - the customer has no email address.\n";
+        exit(1);
+    }
+
+    echo "✅ Email queued successfully!\n";
+    echo "Recipient: {$log->recipient_email}\n";
+    echo "Subject:   {$log->subject}\n";
+    echo "Log id:    {$log->id}\n\n";
+    echo "Deliver it with:\n";
+    echo "  php artisan queue:work --queue=" . InvoiceEmailService::QUEUE . "\n\n";
+    echo "Then check the result at /admin/email-logs\n";
 } catch (\Exception $e) {
-    echo "❌ Email failed!\n";
+    echo "❌ Queueing failed!\n";
     echo "Error: " . $e->getMessage() . "\n";
     echo "File: " . $e->getFile() . ":" . $e->getLine() . "\n\n";
     echo "Stack trace:\n";

@@ -37,11 +37,12 @@ class LeadController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Lead::class);
+        $user = $request->user();
 
-        $query = Lead::with(['creator']);
+        $query = Lead::with(['creator', 'assignedUser', 'pendingFollowups']);
 
-        // Data scope. No-op for the admin, whose scope is "all".
-        $query->applyDataScope($request->user(), 'leads');
+        // Data scope. Scoped to assigned_to for employees, team for managers, all for admin.
+        $query->applyDataScope($user, 'leads');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -51,18 +52,34 @@ class LeadController extends Controller
             $query->where('source', $request->source);
         }
 
+        if ($request->filled('assigned_to')) {
+            $query->where('assigned_to', $request->assigned_to);
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('company', 'like', "%{$search}%");
             });
         }
 
-        $leads = $query->latest()->paginate(15);
+        $leads = $query->latest()->paginate(15)->withQueryString();
 
-        return view('leads.index', compact('leads'));
+        // Assignable sales team members for manager or admin
+        $assignableUsers = collect();
+        if ($user->isAdmin() || $user->isManager()) {
+            $teamIds = \App\Rbac\DataScope::teamIds($user);
+            $assignableUsers = \App\Models\User::query()
+                ->whereIn('id', $teamIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'avatar', 'department']);
+        }
+
+        return view('leads.index', compact('leads', 'assignableUsers'));
     }
 
     /**
@@ -81,8 +98,19 @@ class LeadController extends Controller
     public function createManual()
     {
         $this->authorize('create', Lead::class);
+        $user = Auth::user();
 
-        return view('leads.create');
+        $assignableUsers = collect();
+        if ($user->isAdmin() || $user->isManager()) {
+            $teamIds = \App\Rbac\DataScope::teamIds($user);
+            $assignableUsers = \App\Models\User::query()
+                ->whereIn('id', $teamIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+        }
+
+        return view('leads.create', compact('assignableUsers'));
     }
 
     /**
@@ -103,13 +131,26 @@ class LeadController extends Controller
         $this->authorize('create', Lead::class);
 
         $data = $request->validated();
+        $user = Auth::user();
+
+        // If manager didn't specify assigned_to, default to self or leave null
+        if (! isset($data['assigned_to']) && ! $user->isAdmin()) {
+            $data['assigned_to'] = $user->id;
+        }
 
         $lead = Lead::create([
             ...$data,
-            'created_by' => Auth::id(),
+            'created_by' => $user->id,
         ]);
 
-        $this->logActivity($lead, 'created', 'Lead created');
+        $this->logActivity($lead, 'created', 'Lead created manually');
+
+        if ($lead->assigned_to) {
+            $assignee = \App\Models\User::find($lead->assigned_to);
+            if ($assignee) {
+                $this->logActivity($lead, 'assigned', "Assigned to {$assignee->name}");
+            }
+        }
 
         return redirect()->route('leads.index')
             ->with('success', 'Lead created successfully.');
@@ -156,7 +197,7 @@ class LeadController extends Controller
             }
 
             return $redirect;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return back()->with('error', 'Error importing leads: ' . $e->getMessage());
         }
     }
@@ -178,9 +219,160 @@ class LeadController extends Controller
     {
         $this->authorize('view', $lead);
 
-        $lead->load(['creator', 'activities.user', 'followups.user', 'convertedCustomer', 'notes.user']);
+        $lead->load([
+            'creator',
+            'assignedUser',
+            'activities.user',
+            'statusLogs.changer',
+            'followups.user',
+            'convertedCustomer',
+            'notes.user',
+        ]);
 
-        return view('leads.show', compact('lead'));
+        $user = Auth::user();
+        $assignableUsers = collect();
+        if ($user->isAdmin() || $user->isManager()) {
+            $teamIds = \App\Rbac\DataScope::teamIds($user);
+            $assignableUsers = \App\Models\User::query()
+                ->whereIn('id', $teamIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+        }
+
+        return view('leads.show', compact('lead', 'assignableUsers'));
+    }
+
+    /**
+     * Quick status update endpoint
+     */
+    public function updateStatus(Request $request, Lead $lead)
+    {
+        $this->authorize('updateStatus', $lead);
+
+        $request->validate([
+            'status' => 'required|string|in:new,contacted,follow_up,interested,qualified,converted,won,lost',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $lead->recordStatusChange($request->status, Auth::id(), $request->notes);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Lead status updated to ' . ucfirst(str_replace('_', ' ', $request->status)),
+                'status' => $request->status,
+                'lead' => $lead->fresh(),
+            ]);
+        }
+
+        return back()->with('success', 'Lead status updated successfully.');
+    }
+
+    /**
+     * Assign / reassign a lead to a team member
+     */
+    public function reassign(Request $request, Lead $lead)
+    {
+        $this->authorize('reassign', $lead);
+
+        $request->validate([
+            'assigned_to' => 'required|exists:users,id',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $newAssignee = \App\Models\User::findOrFail($request->assigned_to);
+        $oldAssignee = $lead->assignedUser;
+
+        $lead->update(['assigned_to' => $newAssignee->id]);
+
+        $desc = "Lead assigned to {$newAssignee->name}" . ($oldAssignee ? " (previously: {$oldAssignee->name})" : "");
+        if ($request->notes) {
+            $desc .= " - {$request->notes}";
+        }
+
+        $this->logActivity($lead, 'assigned', $desc, $oldAssignee?->id, (string) $newAssignee->id);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Lead assigned to {$newAssignee->name}.",
+                'assigned_user' => $newAssignee,
+            ]);
+        }
+
+        return back()->with('success', "Lead assigned to {$newAssignee->name}.");
+    }
+
+    /**
+     * Bulk reassign leads
+     */
+    public function bulkReassign(Request $request)
+    {
+        $this->authorize('reassign', Lead::class);
+
+        $request->validate([
+            'lead_ids' => 'required|array|min:1',
+            'lead_ids.*' => 'required|exists:leads,id',
+            'assigned_to' => 'required|exists:users,id',
+        ]);
+
+        $newAssignee = \App\Models\User::findOrFail($request->assigned_to);
+        $leads = Lead::whereIn('id', $request->lead_ids)->get();
+
+        foreach ($leads as $lead) {
+            $oldAssignee = $lead->assignedUser;
+            $lead->update(['assigned_to' => $newAssignee->id]);
+            $this->logActivity($lead, 'assigned', "Bulk reassigned to {$newAssignee->name}", $oldAssignee?->id, (string) $newAssignee->id);
+        }
+
+        return redirect()->route('leads.index')->with('success', count($leads) . " lead(s) successfully reassigned to {$newAssignee->name}.");
+    }
+
+    /**
+     * Bulk distribute leads evenly (Round-Robin) among selected employees
+     */
+    public function bulkDistribute(Request $request)
+    {
+        $this->authorize('reassign', Lead::class);
+
+        $request->validate([
+            'lead_ids' => 'required|array|min:1',
+            'lead_ids.*' => 'required|exists:leads,id',
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'required|exists:users,id',
+        ]);
+
+        $users = \App\Models\User::whereIn('id', $request->user_ids)
+            ->where('is_active', true)
+            ->get()
+            ->values();
+
+        if ($users->isEmpty()) {
+            return redirect()->route('leads.index')->with('error', 'Please select at least one active team member to distribute leads.');
+        }
+
+        $leads = Lead::whereIn('id', $request->lead_ids)->get();
+        $userCount = $users->count();
+
+        foreach ($leads as $index => $lead) {
+            $assignee = $users[$index % $userCount];
+            $oldAssignee = $lead->assignedUser;
+            $lead->update(['assigned_to' => $assignee->id]);
+            $this->logActivity(
+                $lead,
+                'assigned',
+                "Auto-distributed (Round-Robin) to {$assignee->name}",
+                $oldAssignee?->id,
+                (string) $assignee->id
+            );
+        }
+
+        $names = $users->pluck('name')->join(', ', ' and ');
+        return redirect()->route('leads.index')->with(
+            'success',
+            "Successfully distributed {$leads->count()} lead(s) evenly among {$userCount} team member(s) ({$names})."
+        );
     }
 
     /**
@@ -190,7 +382,18 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
 
-        return view('leads.edit', compact('lead'));
+        $user = Auth::user();
+        $assignableUsers = collect();
+        if ($user->isAdmin() || $user->isManager()) {
+            $teamIds = \App\Rbac\DataScope::teamIds($user);
+            $assignableUsers = \App\Models\User::query()
+                ->whereIn('id', $teamIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+        }
+
+        return view('leads.edit', compact('lead', 'assignableUsers'));
     }
 
     /**
@@ -206,6 +409,7 @@ class LeadController extends Controller
 
         if (isset($data['status']) && $data['status'] !== $lead->status) {
             $changes['status'] = ['old' => $lead->status, 'new' => $data['status']];
+            $lead->recordStatusChange($data['status'], Auth::id(), 'Updated from edit form');
         }
 
         $lead->update($data);
@@ -338,12 +542,11 @@ class LeadController extends Controller
             'created_by' => $user->id,
         ]);
 
+        $lead->recordStatusChange('converted', $user->id, "Converted to customer: {$customer->name}");
+
         $lead->update([
-            'status' => 'converted',
             'converted_to_customer_id' => $customer->id,
         ]);
-
-        $this->logActivity($lead, 'status_changed', "Lead status changed from {$oldStatus} to converted", $oldStatus, 'converted');
 
         LeadActivity::create([
             'lead_id' => $lead->id,

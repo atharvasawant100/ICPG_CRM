@@ -7,8 +7,11 @@
     <div class="mb-4 sm:mb-5 md:mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Expense Categories</h2>
         <button onclick="document.getElementById('add-category-form').classList.toggle('hidden')"
-            class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
-            Add Custom Category
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Add Custom Category</span>
         </button>
     </div>
 
@@ -34,8 +37,11 @@
             </div>
             <div class="flex gap-3">
                 <button type="submit"
-                    class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white font-semibold py-2.5 px-5 rounded-lg text-sm shadow-md transition-all duration-200">
-                    Add Category
+                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-xl text-sm shadow-md hover:shadow-lg transition-all duration-200">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Add Category</span>
                 </button>
                 <button type="button" onclick="document.getElementById('add-category-form').classList.add('hidden')"
                     class="bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-2.5 px-5 rounded-lg text-sm transition-all duration-200">
@@ -94,10 +100,10 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 @if($category->is_custom)
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-1.5">
                                         <button
                                             onclick="editCategory({{ $category->id }}, '{{ $category->name }}', '{{ $category->description ?? '' }}')"
-                                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">Edit</button>
+                                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">Edit</button>
                                         <form action="{{ route('expense-categories.destroy', $category) }}" method="POST" class="inline"
                                             onsubmit="return confirm('Delete this category?');">
                                             @csrf
@@ -147,10 +153,10 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">Created by:
                         {{ $category->creator ? $category->creator->name : 'System' }}</p>
                     @if($category->is_custom)
-                        <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex flex-wrap gap-1.5 pt-2 border-t border-gray-200 dark:border-gray-700">
                             <button
                                 onclick="editCategory({{ $category->id }}, '{{ $category->name }}', '{{ $category->description ?? '' }}')"
-                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">Edit</button>
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">Edit</button>
                             <form action="{{ route('expense-categories.destroy', $category) }}" method="POST" class="inline"
                                 onsubmit="return confirm('Delete?');">
                                 @csrf
@@ -198,8 +204,11 @@
                     </div>
                     <div class="flex gap-3">
                         <button type="submit"
-                            class="bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white font-semibold py-2.5 px-5 rounded-lg text-sm shadow-md transition-all duration-200 flex-1">
-                            Update
+                            class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-xl text-sm shadow-md hover:shadow-lg transition-all duration-200 flex-1">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>Update</span>
                         </button>
                         <button type="button"
                             onclick="document.getElementById('edit-category-modal').classList.add('hidden')"

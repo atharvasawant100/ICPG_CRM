@@ -17,11 +17,14 @@ class LeadFollowup extends Model
     /** Audit module label. */
     protected $auditModule = 'followups';
 
-        protected $fillable = [
+    protected $fillable = [
         'lead_id',
         'user_id',
         'followup_date',
         'followup_type',
+        'meeting_link',
+        'agenda',
+        'meeting_platform',
         'description',
         'status',
         'reminders_sent',

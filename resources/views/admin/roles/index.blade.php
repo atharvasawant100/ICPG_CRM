@@ -6,9 +6,6 @@
 @section('content')
     <div class="mb-4 sm:mb-5 md:mb-6">
         <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Roles &amp; Permissions</h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Choose a role to control which modules it can reach and how much of each module it can see.
-        </p>
     </div>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700">
@@ -25,14 +22,30 @@
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     @foreach ($roles as $entry)
+                        @php
+                            $roleName = $entry['model']->name;
+                            $displayName = ucwords(str_replace('_', ' ', $roleName));
+                            if (str_starts_with($displayName, 'Hr ') || $displayName === 'Hr') {
+                                $displayName = preg_replace('/^Hr\b/', 'HR', $displayName);
+                            }
+                        @endphp
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                             <td class="px-6 py-4">
                                 <div class="font-semibold text-gray-800 dark:text-white">
-                                    {{ ucfirst($entry['model']->name) }}
+                                    {{ $displayName }}
                                 </div>
-                                @if ($entry['model']->name === 'admin')
+                                <span class="sr-only">{{ ucfirst($roleName) }}</span>
+                                @if ($roleName === 'admin')
                                     <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                        Always has full access
+                                        Always has full access (System)
+                                    </div>
+                                @elseif (str_ends_with($roleName, '_manager') || $roleName === 'manager')
+                                    <div class="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5 font-medium">
+                                        Department Management
+                                    </div>
+                                @else
+                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        Department Staff
                                     </div>
                                 @endif
                             </td>
@@ -52,7 +65,7 @@
                                             <span class="text-xs text-gray-400 italic">Locked</span>
                                         @else
                                             <a href="{{ route('admin.roles.edit', $entry['model']) }}"
-                                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">
                                                 Edit Permissions
                                             </a>
                                         @endif
@@ -69,10 +82,18 @@
 
         <div class="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
             @foreach ($roles as $entry)
+                @php
+                    $roleName = $entry['model']->name;
+                    $displayName = ucwords(str_replace('_', ' ', $roleName));
+                    if (str_starts_with($displayName, 'Hr ') || $displayName === 'Hr') {
+                        $displayName = preg_replace('/^Hr\b/', 'HR', $displayName);
+                    }
+                @endphp
                 <div class="p-4">
                     <div class="flex items-center justify-between gap-2 mb-2">
                         <span class="font-semibold text-gray-800 dark:text-white">
-                            {{ ucfirst($entry['model']->name) }}</span>
+                            {{ $displayName }}</span>
+                        <span class="sr-only">{{ ucfirst($roleName) }}</span>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
                             {{ $entry['users_count'] }} users &middot; {{ $entry['permissions_count'] }} perms
                         </span>
@@ -80,7 +101,7 @@
                     @can('roles.edit')
                         @if ($entry['model']->name !== 'admin')
                             <a href="{{ route('admin.roles.edit', $entry['model']) }}"
-                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">
                                 Edit Permissions</a>
                         @else
                             <span class="text-xs text-gray-400 italic">Locked</span>

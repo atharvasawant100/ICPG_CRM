@@ -69,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ExpenseCategory::class, ExpenseCategoryPolicy::class);
         Gate::policy(\App\Models\User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(\App\Models\Task::class, \App\Policies\TaskPolicy::class);
 
         /*
          | Role abilities that take a Role argument. Spatie's Role is not an
@@ -78,6 +79,15 @@ class AppServiceProvider extends ServiceProvider
          */
         Gate::define('update', [RolePolicy::class, 'update']);
         Gate::define('view', [RolePolicy::class, 'view']);
+
+        // Team module is exclusive to Department Managers for their team (not for Admin or HR)
+        Gate::define('team.view', function (\App\Models\User $user) {
+            if ($user->isAdmin() || $user->isHr()) {
+                return false;
+            }
+
+            return $user->isManager();
+        });
     }
 
     /**
@@ -96,11 +106,80 @@ class AppServiceProvider extends ServiceProvider
             }
 
             try {
-                return $user->hasRole(Rbac::ADMIN_ROLE) ? true : null;
+                if ($user->hasRole(Rbac::ADMIN_ROLE)) {
+                    // Admins are business owners/employers; they do not have personal employee attendance, leaves, expense claims, or department team
+                    if (in_array($ability, ['my_attendance.view', 'my_leaves.view', 'my_leaves.create', 'my_expenses.view', 'my_expenses.create', 'team.view'], true)) {
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                // Non-sales and non-admin users can never access sales module abilities
+                $module = explode('.', $ability)[0];
+                if (in_array($module, ['customers', 'sales_tracking', 'leads', 'followups'], true)) {
+                    if (! $user->isAdmin() && ! $user->isSales()) {
+                        return false;
+                    }
+                }
+
+                // HR users do not have a department team view or task assignments
+                if ($user->isHr() && in_array($ability, ['team.view', 'tasks.view', 'tasks.create', 'tasks.edit', 'tasks.delete'], true)) {
+                    return false;
+                }
+
+                // HR users have access to HR operational capabilities: departments, users, attendance, leaves, and payroll
+                if ($user->isHr() && in_array($ability, [
+                    'departments.view',
+                    'users.view', 'users.create', 'users.edit',
+                    'attendance.view', 'attendance.create', 'attendance.edit',
+                    'leaves.view', 'leaves.create', 'leaves.approve', 'leaves.settings',
+                    'payroll.view', 'payroll.create', 'payroll.edit', 'payroll.delete', 'payroll.export',
+                ], true)) {
+                    return true;
+                }
+
+                // Department managers inherit permissions granted to their department's role (e.g. Sales Manager gets permissions ticked on Sales role)
+                static $deptRolePermissions = [];
+                if ($user->isManager() && ! empty($user->department)) {
+                    $dept = strtolower((string) $user->department);
+                    if (! array_key_exists($dept, $deptRolePermissions)) {
+                        $role = Role::where('name', $dept)->where('guard_name', Rbac::GUARD)->first();
+                        $deptRolePermissions[$dept] = $role ? $role->permissions->pluck('name')->all() : [];
+                    }
+
+                    if (in_array($ability, $deptRolePermissions[$dept], true)) {
+                        return true;
+                    }
+                }
+
+                return null;
             } catch (\Throwable) {
                 // Permission tables unavailable (e.g. mid-migration): fall back to
                 // the legacy mirror rather than locking everyone out.
-                return $user->getAttribute('role') === Rbac::ADMIN_ROLE ? true : null;
+                if ($user->getAttribute('role') === Rbac::ADMIN_ROLE) {
+                    if (in_array($ability, ['my_attendance.view', 'my_leaves.view', 'my_leaves.create', 'my_expenses.view', 'my_expenses.create', 'team.view'], true)) {
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                if ($user->isHr() && $ability === 'team.view') {
+                    return false;
+                }
+
+                if ($user->isHr() && in_array($ability, [
+                    'departments.view',
+                    'users.view', 'users.create', 'users.edit',
+                    'attendance.view', 'attendance.create', 'attendance.edit',
+                    'leaves.view', 'leaves.create', 'leaves.approve', 'leaves.settings',
+                    'payroll.view', 'payroll.create', 'payroll.edit', 'payroll.delete', 'payroll.export',
+                ], true)) {
+                    return true;
+                }
+
+                return null;
             }
         });
     }

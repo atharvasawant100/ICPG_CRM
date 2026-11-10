@@ -30,6 +30,12 @@ class UpdateUserRequest extends FormRequest
         $user = $this->route('user');
 
         return [
+            'emp_id' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('users', 'emp_id')->ignore($user?->id),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required', 'email', 'max:255',
@@ -45,9 +51,15 @@ class UpdateUserRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $merge = [
             'designation' => Designation::slug($this->input('designation')) ?: null,
-        ]);
+        ];
+
+        if ($this->has('emp_id')) {
+            $merge['emp_id'] = ($raw = trim((string) $this->input('emp_id'))) !== '' ? strtoupper($raw) : null;
+        }
+
+        $this->merge($merge);
     }
 
     public function withValidator(Validator $validator): void
@@ -165,6 +177,11 @@ class UpdateUserRequest extends FormRequest
             return null;
         }
 
+        // A manager leads the department and does not report to the previous manager
+        if (Rbac::isManagerRole($this->resolvedRole())) {
+            return null;
+        }
+
         return Department::query()
             ->where('name', $department)
             ->first()
@@ -174,6 +191,7 @@ class UpdateUserRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'emp_id.unique' => 'That Employee ID is already in use.',
             'name.required' => 'Please enter a name.',
             'email.required' => 'Please enter an email address.',
             'email.unique' => 'That email address is already in use.',

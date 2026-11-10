@@ -22,9 +22,13 @@ class StoreLeadFollowupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'followup_date' => 'required|date|after_or_equal:today',
+            'followup_date' => 'required|date',
             'followup_type' => 'required|in:call,email,meeting,visit,other',
             'description' => 'nullable|string|max:1000',
+            'agenda' => 'nullable|string|max:2000',
+            'meeting_link' => 'nullable|string|max:500',
+            'meeting_platform' => 'nullable|string|in:jitsi,google_meet,zoom,custom',
+            'send_email_to_lead' => 'nullable|boolean',
         ];
     }
 }

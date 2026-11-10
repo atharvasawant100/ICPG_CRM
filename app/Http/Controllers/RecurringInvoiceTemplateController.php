@@ -12,15 +12,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
+use App\Services\RecurringInvoiceService;
+
 class RecurringInvoiceTemplateController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request, RecurringInvoiceService $recurringService)
     {
-
         $this->authorize('viewAny', RecurringInvoiceTemplate::class);
+
+        // Auto-generate any due templates so overdue templates are never stuck
+        $recurringService->processDueTemplates();
 
         $templates = RecurringInvoiceTemplate::with(['customer', 'creator'])
             ->applyDataScope($request->user(), 'recurring_invoices')
@@ -253,5 +257,26 @@ class RecurringInvoiceTemplateController extends Controller
 
         $message = $template->is_active ? 'Template activated.' : 'Template deactivated.';
         return back()->with('success', $message);
+    }
+
+    /**
+     * Manually generate an invoice from a recurring template immediately.
+     */
+    public function generate(RecurringInvoiceTemplate $template, RecurringInvoiceService $recurringService)
+    {
+        $this->authorize('generate', $template);
+
+        if (!$template->is_active) {
+            return back()->with('error', 'Cannot generate invoice from an inactive template.');
+        }
+
+        try {
+            $invoice = $recurringService->generateFromTemplate($template);
+
+            return redirect()->route('invoices.show', $invoice)
+                ->with('success', "Invoice {$invoice->invoice_number} generated successfully and email dispatched to customer.");
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Failed to generate invoice: ' . $e->getMessage());
+        }
     }
 }

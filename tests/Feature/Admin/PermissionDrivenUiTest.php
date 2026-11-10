@@ -373,4 +373,94 @@ class PermissionDrivenUiTest extends RbacTestCase
         $this->actingAs($user)->get('/admin/users')->assertForbidden();
         $this->actingAs($user)->get('/admin/audit-logs')->assertForbidden();
     }
+
+    public function test_hr_dashboard_does_not_show_task_containers_or_overdue(): void
+    {
+        $hrUser = User::factory()->create([
+            'email' => 'katrina_hr@example.com',
+            'department' => 'hr',
+            'designation' => 'Hr Executive',
+            'role' => 'hr',
+            'is_active' => true,
+        ]);
+        $hrUser->assignRbacRole('hr');
+        $hrUser->givePermissionTo('dashboard.view');
+
+        $response = $this->actingAs($hrUser)->get('/dashboard');
+        $response->assertSuccessful();
+
+        $content = $response->getContent();
+
+        // Must show Workplace metrics like Working Hours, Leave Remaining, Attendance
+        $this->assertStringContainsString('Working Hours', $content);
+        $this->assertStringContainsString('Leave Remaining', $content);
+        $this->assertStringContainsString('Attendance', $content);
+
+        // Must NOT show Task Completed or Overdue Tasks containers on the workplace dashboard
+        $this->assertStringNotContainsString('Tasks Completed', $content);
+        $this->assertStringNotContainsString('Overdue Tasks', $content);
+        $this->assertStringNotContainsString('My Assigned Tasks', $content);
+
+        // Sidebar must NOT show Task Pool
+        $this->assertStringNotContainsString('Task Pool', $content);
+    }
+
+    public function test_sales_manager_dashboard_does_not_show_task_containers_or_pool(): void
+    {
+        $salesManager = User::factory()->create([
+            'name' => 'Akshata Atharva Sawant',
+            'email' => 'akshata_sales@example.com',
+            'department' => 'sales',
+            'designation' => 'Manager',
+            'role' => 'manager',
+            'is_active' => true,
+        ]);
+        $salesManager->assignRbacRole('manager');
+        $salesManager->givePermissionTo('dashboard.view');
+
+        $response = $this->actingAs($salesManager)->get('/dashboard');
+        $response->assertSuccessful();
+
+        $content = $response->getContent();
+
+        // Must show manager overview cards
+        $this->assertStringContainsString('Department &amp; Team Overview', $content);
+        $this->assertStringContainsString('Department Team', $content);
+        $this->assertStringContainsString('Paid Leaves Balance', $content);
+
+        // Must NOT show any task-related elements
+        $this->assertStringNotContainsString('Team Tasks', $content);
+        $this->assertStringNotContainsString('Daily Tasks Done (Today)', $content);
+        $this->assertStringNotContainsString('Team Tasks Container', $content);
+        $this->assertStringNotContainsString('Task Pool', $content);
+    }
+
+    public function test_sales_employee_dashboard_does_not_show_tasks(): void
+    {
+        $salesUser = User::factory()->create([
+            'email' => 'rahul_sales@example.com',
+            'department' => 'sales',
+            'designation' => 'Sales Executive',
+            'role' => 'sales',
+            'is_active' => true,
+        ]);
+        $salesUser->assignRbacRole('sales');
+        $salesUser->givePermissionTo('dashboard.view');
+
+        $response = $this->actingAs($salesUser)->get('/dashboard');
+        $response->assertSuccessful();
+
+        $content = $response->getContent();
+
+        // Must show Workplace metrics
+        $this->assertStringContainsString('Working Hours', $content);
+        $this->assertStringContainsString('Leave Remaining', $content);
+        $this->assertStringContainsString('Attendance', $content);
+
+        // Must NOT show Task Completed or Overdue Tasks containers
+        $this->assertStringNotContainsString('Tasks Completed', $content);
+        $this->assertStringNotContainsString('Overdue Tasks', $content);
+        $this->assertStringNotContainsString('My Assigned Tasks', $content);
+        $this->assertStringNotContainsString('Task Pool', $content);
+    }
 }

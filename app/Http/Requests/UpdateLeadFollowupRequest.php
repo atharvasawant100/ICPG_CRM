@@ -25,7 +25,12 @@ class UpdateLeadFollowupRequest extends FormRequest
             'followup_date' => 'required|date',
             'followup_type' => 'required|in:call,email,meeting,visit,other',
             'description' => 'nullable|string|max:1000',
+            'agenda' => 'nullable|string|max:2000',
+            'meeting_link' => 'nullable|string|max:500',
+            'meeting_platform' => 'nullable|string|in:jitsi,google_meet,zoom,custom',
             'status' => 'nullable|in:pending,completed,missed,cancelled',
+            'cancellation_reason' => 'nullable|string|max:500',
+            'send_email_to_lead' => 'nullable|boolean',
         ];
     }
 }

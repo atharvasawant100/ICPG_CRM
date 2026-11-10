@@ -155,12 +155,56 @@
         .dark ::-webkit-scrollbar-thumb {
             background-color: rgb(75 85 99);
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background-color: rgb(107 114 128);
+        /* Primary Action Buttons: Vibrant Purple / Indigo (#4f46e5) in BOTH Light and Dark Mode */
+        body :not(#sidebar):not(aside) button.bg-indigo-600,
+        body :not(#sidebar):not(aside) a.bg-indigo-600,
+        body :not(#sidebar):not(aside) button.bg-blue-600,
+        body :not(#sidebar):not(aside) a.bg-blue-600,
+        body :not(#sidebar):not(aside) button.bg-teal-600,
+        body :not(#sidebar):not(aside) a.bg-teal-600,
+        body :not(#sidebar):not(aside) button.from-gray-800,
+        body :not(#sidebar):not(aside) a.from-gray-800,
+        body :not(#sidebar):not(aside) button.bg-gradient-to-r.from-gray-800,
+        body :not(#sidebar):not(aside) a.bg-gradient-to-r.from-gray-800,
+        body :not(#sidebar):not(aside) button[type="submit"]:not([class*="bg-red"]):not([class*="bg-green"]):not([class*="bg-emerald"]):not([class*="bg-amber"]):not([class*="bg-gray"]):not([class*="bg-white"]):not([class*="border-gray"]) {
+            background-image: none !important;
+            background-color: #4f46e5 !important;
+            color: #ffffff !important;
+            border-color: #4f46e5 !important;
+            border-radius: 0.75rem !important;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.25), 0 2px 4px -2px rgba(79, 70, 229, 0.2) !important;
         }
+
+        body :not(#sidebar):not(aside) button.bg-indigo-600:hover,
+        body :not(#sidebar):not(aside) a.bg-indigo-600:hover,
+        body :not(#sidebar):not(aside) button.bg-blue-600:hover,
+        body :not(#sidebar):not(aside) a.bg-blue-600:hover,
+        body :not(#sidebar):not(aside) button.bg-teal-600:hover,
+        body :not(#sidebar):not(aside) a.bg-teal-600:hover,
+        body :not(#sidebar):not(aside) button.hover\:bg-indigo-700:hover,
+        body :not(#sidebar):not(aside) a.hover\:bg-indigo-700:hover,
+        body :not(#sidebar):not(aside) button.hover\:bg-blue-700:hover,
+        body :not(#sidebar):not(aside) a.hover\:bg-blue-700:hover,
+        body :not(#sidebar):not(aside) button.hover\:bg-teal-700:hover,
+        body :not(#sidebar):not(aside) a.hover\:bg-teal-700:hover,
+        body :not(#sidebar):not(aside) button.from-gray-800:hover,
+        body :not(#sidebar):not(aside) a.from-gray-800:hover,
+        body :not(#sidebar):not(aside) button.hover\:from-gray-700:hover,
+        body :not(#sidebar):not(aside) a.hover\:from-gray-700:hover,
+        body :not(#sidebar):not(aside) button[type="submit"]:not([class*="bg-red"]):not([class*="bg-green"]):not([class*="bg-emerald"]):not([class*="bg-amber"]):not([class*="bg-gray"]):not([class*="bg-white"]):not([class*="border-gray"]):hover {
+            background-image: none !important;
+            background-color: #4338ca !important;
+            color: #ffffff !important;
+            border-color: #4338ca !important;
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.35), 0 4px 6px -4px rgba(79, 70, 229, 0.2) !important;
+        }
+
+        [x-cloak] { display: none !important; }
     </style>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-200">
     <div class="flex h-screen overflow-hidden">
@@ -168,7 +212,7 @@
         <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 z-[60] lg:hidden hidden transition-opacity duration-300" onclick="toggleSidebar()"></div>
         
         <!-- Sidebar -->
-        <div id="sidebar" class="fixed lg:static inset-y-0 left-0 z-[70] -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out w-64 max-w-[85vw]">
+        <div id="sidebar" class="fixed lg:static inset-y-0 left-0 z-[70] -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out w-72 max-w-[85vw]">
             @include('components.sidebar')
         </div>
         
@@ -204,11 +248,9 @@
                                 </svg>
                                 <!-- Notification Badge -->
                                 @php
-                                    $upcomingCount = \App\Models\RecurringInvoiceTemplate::active()
-                                        ->where('next_generation_date', '<=', \Carbon\Carbon::today()->addDays(3))
-                                        ->count();
-
-                                    $unreadNotificationsCount = auth()->user()->unreadNotifications()->count();
+                                    $notificationFeed = app(\App\Services\NotificationFeed::class);
+                                    $upcomingCount = $notificationFeed->upcomingCount(auth()->user());
+                                    $unreadNotificationsCount = $notificationFeed->unreadCount(auth()->user());
                                     $totalNotificationCount = $upcomingCount + $unreadNotificationsCount;
                                 @endphp
                                 <span id="notification-badge"
@@ -226,14 +268,9 @@
                                 </div>
                                 <div id="notification-list" class="max-h-96 overflow-y-auto">
                                     @php
-                                        $upcomingTemplates = \App\Models\RecurringInvoiceTemplate::with('customer')
-                                            ->active()
-                                            ->where('next_generation_date', '<=', \Carbon\Carbon::today()->addDays(3))
-                                            ->orderBy('next_generation_date')
-                                            ->limit(10)
-                                            ->get();
-                                            
-                                        $notifications = auth()->user()->unreadNotifications()->latest()->limit(10)->get();
+                                        $upcomingTemplates = $notificationFeed->upcomingTemplates(auth()->user(), 10);
+
+                                        $notifications = $notificationFeed->unread(auth()->user(), 10);
                                     @endphp
                                     
                                     <div id="notification-unread-items">
@@ -336,35 +373,80 @@
                             <div class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200" id="current-time"></div>
                             <div class="text-xs text-gray-600 dark:text-gray-400" id="current-date"></div>
                         </div>
-                        <!-- Profile Link -->
-                        <a href="{{ route('profile.show') }}" class="hidden sm:flex items-center space-x-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                            </svg>
-                            <span class="text-sm font-medium hidden md:inline">{{ Auth::user()->name }}</span>
 
-                            {{-- Role badge: display only. Every access decision is
-                                 made by policies and middleware, never here.
-                                 Note: no @if inside a tag attribute, which
-                                 breaks Blade's compiler for everything after it. --}}
+                        <!-- Live Attendance Punch Widget (Employees & Managers) -->
+                        @if (! Auth::user()->isAdmin())
                             @php
-                                $headerRoleName = Auth::user()->getRoleNames()->first();
-                                $headerDepartment = Auth::user()->department;
-                                $headerBadgeTitle = $headerDepartment
-                                    ? 'Department: '.ucfirst($headerDepartment)
-                                    : null;
+                                $todayAttendance = \App\Models\Attendance::where('user_id', Auth::id())
+                                    ->whereDate('date', \Carbon\Carbon::today())
+                                    ->first();
+                                $isPunchedIn = $todayAttendance && $todayAttendance->check_in;
+                                $isPunchedOut = $todayAttendance && $todayAttendance->check_out;
                             @endphp
-                            @if ($headerRoleName)
-                                <span title="{{ $headerBadgeTitle }}"
-                                    class="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300 text-[11px] font-semibold leading-5">
-                                    Role: {{ ucfirst($headerRoleName) }}
-                                    @if ($headerDepartment)
-                                        <span
-                                            class="hidden lg:inline font-normal opacity-80">&middot;
-                                            {{ ucfirst($headerDepartment) }}</span>
-                                    @endif
-                                </span>
-                            @endif
+
+                            <div class="hidden sm:flex items-center">
+                                @if ($isPunchedOut)
+                                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+                                        <span>Out: {{ \Carbon\Carbon::parse($todayAttendance->check_out)->format('h:i A') }}</span>
+                                        <span class="text-[10px] text-gray-400">({{ floor($todayAttendance->total_minutes / 60) }}h {{ $todayAttendance->total_minutes % 60 }}m)</span>
+                                    </div>
+                                @elseif ($isPunchedIn)
+                                    <button type="button" onclick="openPunchOutModal()"
+                                        title="Click to Punch Out & Log Tasks"
+                                        class="group flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-xs font-semibold shadow-sm transition-all">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>In: {{ \Carbon\Carbon::parse($todayAttendance->check_in)->format('h:i A') }}</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-white text-[10px] transition-colors">Punch Out</span>
+                                    </button>
+                                @else
+                                    <form action="{{ route('attendance.punch-in') }}" method="POST" class="inline">
+                                        @csrf
+                                        <button type="submit"
+                                            title="Click to Punch In"
+                                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                            <span>Punch In</span>
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        @endif
+
+                        <!-- Profile Link -->
+                        <a href="{{ route('profile.show') }}" class="hidden sm:flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white px-2.5 py-1 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                            @php
+                                $headerUser = Auth::user();
+                                $headerInitials = collect(explode(' ', $headerUser->name))->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode('');
+                                $headerRoleName = $headerUser->getRoleNames()->first();
+                                $headerDesignation = $headerUser->designation ? ucwords($headerUser->designation) : ($headerRoleName ? ucfirst($headerRoleName) : 'Member');
+                                $headerDepartment = $headerUser->department ? ucfirst($headerUser->department) : null;
+                            @endphp
+
+                            <!-- Avatar -->
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-800 to-gray-700 text-white font-bold text-xs flex items-center justify-center shadow-sm flex-shrink-0 overflow-hidden ring-1 ring-gray-200 dark:ring-gray-700">
+                                @if ($headerUser->avatar_url)
+                                    <img src="{{ $headerUser->avatar_url }}" alt="{{ $headerUser->name }}" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('header-avatar-fallback').style.display='flex';">
+                                    <span id="header-avatar-fallback" style="display:none;" class="w-full h-full items-center justify-center">{{ $headerInitials ?: 'U' }}</span>
+                                @else
+                                    {{ $headerInitials ?: 'U' }}
+                                @endif
+                            </div>
+
+                            <!-- User Info Stacked: Name <br> Designation <br> Department -->
+                            <div class="text-left leading-tight hidden md:block">
+                                <div class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-tight">
+                                    {{ $headerUser->name }}
+                                </div>
+                                <div class="text-[11px] font-medium text-gray-600 dark:text-gray-300 leading-tight">
+                                    {{ $headerDesignation }}
+                                </div>
+                                @if ($headerDepartment)
+                                    <div class="text-[10px] font-semibold text-teal-600 dark:text-teal-400 leading-tight">
+                                        {{ $headerDepartment }}
+                                    </div>
+                                @endif
+                            </div>
                         </a>
                     </div>
                 </div>
@@ -748,5 +830,8 @@
             }
         });
     </script>
+
+    @include('components.punch-out-modal')
+    @include('components.attendance-tab-monitor')
 </body>
 </html>

@@ -5,13 +5,7 @@
 
 @section('content')
     <div class="mb-4 sm:mb-5 md:mb-6">
-        <a href="{{ route('admin.departments.index') }}"
-            class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-3">
-            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Departments
-        </a>
+
 
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -96,6 +90,34 @@
         </div>
     </div>
 
+    {{-- Configured Designations & Role --}}
+    @php
+        $deptDesignations = $department->parsedDesignations();
+    @endphp
+    <div class="mb-4 sm:mb-5 md:mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 border border-gray-100 dark:border-gray-700">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h3 class="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider">
+                Configured Designations (Job Titles)
+            </h3>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Security Role: 
+                <a href="{{ route('admin.roles.index') }}" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                    {{ ucfirst($department->name) }} &rarr;
+                </a>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            @foreach($deptDesignations as $slug => $label)
+                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold {{ $slug === 'manager' || str_contains($slug, 'manager') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600' }}">
+                    {{ $label }}
+                    @if($slug === 'manager' || str_contains($slug, 'manager'))
+                        <span class="ml-1.5 text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400">&bull; Manager Role</span>
+                    @endif
+                </span>
+            @endforeach
+        </div>
+    </div>
+
     {{-- Team --}}
     <div
         class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700">
@@ -119,8 +141,10 @@
                         @php($memberRole = $member->getRoleNames()->first())
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                             <td class="px-6 py-4">
-                                <div class="font-semibold text-gray-800 dark:text-white">{{ $member->name }}</div>
-                                <div class="text-sm text-gray-500 dark:text-gray-400">{{ $member->email }}</div>
+                                <a href="{{ route('admin.users.show', $member) }}" class="group">
+                                    <div class="font-semibold text-gray-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{{ $member->name }}</div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ $member->email }}</div>
+                                </a>
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

@@ -134,8 +134,4 @@
             <p class="text-gray-500 text-center py-4 dark:text-gray-400">This service has not been used in any invoices yet.</p>
         </div>
     @endif
-    <div class="mt-6">
-        <a href="{{ route('services.index') }}"
-            class="text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors dark:text-gray-400 dark:hover:text-gray-200">← Back to Services</a>
-    </div>
 @endsection

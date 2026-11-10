@@ -37,6 +37,12 @@
             </div>
         </div>
 
+        @if(session('status'))
+            <div class="mb-4 bg-gradient-to-r from-emerald-50 to-green-100 dark:from-emerald-950/40 dark:to-green-900/40 border-l-4 border-emerald-500 text-emerald-800 dark:text-emerald-200 px-4 py-3 rounded-lg shadow-sm text-sm font-medium">
+                {{ session('status') }}
+            </div>
+        @endif
+
         @if($errors->any())
             <div
                 class="mb-4 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/40 dark:to-red-800/40 border-l-4 border-red-500 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg shadow-sm">
@@ -58,7 +64,12 @@
             </div>
 
             <div class="mb-5">
-                <label for="password" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Password</label>
+                <div class="flex items-center justify-between mb-2">
+                    <label for="password" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold">Password</label>
+                    <a href="{{ route('password.request') }}" class="text-xs sm:text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                        Forgot Password?
+                    </a>
+                </div>
                 <div class="relative">
                     <input type="password" name="password" id="password" required
                         class="shadow-sm appearance-none border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg w-full py-2.5 px-4 pr-10 text-gray-700 dark:text-gray-200 leading-tight focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all">
@@ -92,7 +103,7 @@
             </div>
 
             <button type="submit"
-                class="w-full bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-700 dark:hover:to-blue-800 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition-all duration-200 mb-4">
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 mb-4">
                 Login
             </button>
         </form>

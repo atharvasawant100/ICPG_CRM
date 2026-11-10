@@ -11,71 +11,172 @@
             <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Created on {{ $invoice->created_at->format('M d, Y') }}
             </p>
         </div>
-        <div class="flex gap-2 flex-wrap">
-            @if(in_array($invoice->status, ['draft', 'sent']) && $invoice->payments->isEmpty())
-                <a href="{{ route('invoices.edit', $invoice) }}"
-                    class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
-                    Edit
-                </a>
-            @endif
-            @if($invoice->status === 'draft')
-                <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="inline"
-                    onsubmit="return confirm('Are you sure you want to delete this invoice?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit"
-                        class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
-                        Delete
-                    </button>
-                </form>
-            @endif
-            @if(in_array($invoice->status, ['draft', 'sent', 'partial', 'paid']))
-                <form action="{{ route('invoices.send', $invoice) }}" method="POST" class="inline">
-                    @csrf
-                    <input type="hidden" name="send_email" value="0" id="send_email_hidden">
-                    <button type="submit" onclick="document.getElementById('send_email_hidden').value='0'"
-                        class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
-                        Mark as Sent
-                    </button>
-                </form>
-                @if($invoice->customer->email)
-                    @php
-                        $emailCount = (int) ($invoice->email_sent_count ?? 0);
-                        $emailCountLabel = $emailCount > 0 ? " ({$emailCount})" : '';
-                        $lastEmailLabel = $invoice->email_sent_at ? $invoice->email_sent_at->format('M d, Y h:i A') : null;
-                        $confirmText = $lastEmailLabel
-                            ? "Email was sent {$emailCount} time(s). Last sent on {$lastEmailLabel}. Send again to {$invoice->customer->email}?"
-                            : "Are you sure you want to send this invoice to {$invoice->customer->email}?";
-                    @endphp
-                    <form action="{{ route('invoices.send', $invoice) }}" method="POST" class="inline"
-                        onsubmit="return confirmInvoiceEmail(this, @js($confirmText));">
-                        @csrf
-                        <input type="hidden" name="send_email" value="1">
-                        <button type="submit" id="btn-send-email"
-                            class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
-                            Send As Email{{ $emailCountLabel }}
-                        </button>
-                    </form>
-                @endif
-            @endif
-            @if(!in_array($invoice->status, ['paid', 'cancelled']))
-                <form action="{{ route('invoices.cancel', $invoice) }}" method="POST" class="inline"
-                    onsubmit="return confirm('Are you sure you want to cancel this invoice?');">
-                    @csrf
-                    <button type="submit"
-                        class="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
-                        Cancel
-                    </button>
-                </form>
-            @endif
-            <a href="{{ route('invoices.pdf', $invoice) }}" id="btn-download-pdf"
-                class="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">
-                Download PDF
+        <div class="flex items-center gap-2.5 flex-wrap">
+            <a href="{{ route('invoices.pdf', $invoice) }}" download="{{ $invoice->getPdfFilename() }}" id="btn-download-pdf"
+                class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 sm:px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                <span>Download PDF</span>
             </a>
+
+            @php
+                $canEdit = in_array($invoice->status, ['draft', 'sent']) && $invoice->payments->isEmpty();
+                $canSendEmail = in_array($invoice->status, ['draft', 'sent', 'partial', 'paid']) && !empty($invoice->customer->email);
+                $canMarkSent = in_array($invoice->status, ['draft', 'sent', 'partial', 'paid']);
+                $canCancel = !in_array($invoice->status, ['paid', 'cancelled']);
+                $canDelete = $invoice->status === 'draft';
+                $hasSecondaryActions = $canEdit || $canSendEmail || $canMarkSent || $canCancel || $canDelete;
+            @endphp
+
+            @if($hasSecondaryActions)
+                <div class="relative" id="invoice-actions-dropdown">
+                    <button type="button" id="btn-invoice-actions"
+                        class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 dark:border-gray-600 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:shadow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        aria-expanded="false"
+                        aria-haspopup="true">
+                        <span>Actions</span>
+                        <svg class="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" id="invoice-actions-caret" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+
+                    <div id="invoice-actions-menu"
+                        class="hidden absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 py-1.5 z-50 transform origin-top-right transition-all duration-150">
+                        @if($canEdit)
+                            <a href="{{ route('invoices.edit', $invoice) }}"
+                                class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-700/60 dark:hover:text-white transition-colors">
+                                <svg class="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                                <span>Edit Invoice</span>
+                            </a>
+                        @endif
+
+                        @if($canSendEmail)
+                            @php
+                                $emailCount = (int) ($invoice->email_sent_count ?? 0);
+                                $lastEmailLabel = $invoice->email_sent_at ? $invoice->email_sent_at->format('M d, Y h:i A') : null;
+                                $confirmText = $lastEmailLabel
+                                    ? "Email was sent {$emailCount} time(s). Last sent on {$lastEmailLabel}. Send again to {$invoice->customer->email}?"
+                                    : "Are you sure you want to send this invoice to {$invoice->customer->email}?";
+                            @endphp
+                            <form action="{{ route('invoices.send', $invoice) }}" method="POST"
+                                onsubmit="return confirmInvoiceEmail(this, @js($confirmText));">
+                                @csrf
+                                <input type="hidden" name="send_email" value="1">
+                                <button type="submit" id="btn-send-email"
+                                    class="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-700/60 dark:hover:text-white transition-colors text-left disabled:opacity-60 disabled:cursor-wait">
+                                    <span class="flex items-center gap-3">
+                                        <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>Send As Email</span>
+                                    </span>
+                                    @if($emailCount > 0)
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">
+                                            {{ $emailCount }}
+                                        </span>
+                                    @endif
+                                </button>
+                            </form>
+                        @endif
+
+                        @if($canMarkSent)
+                            <form action="{{ route('invoices.send', $invoice) }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="send_email" value="0">
+                                <button type="submit"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-700/60 dark:hover:text-white transition-colors text-left">
+                                    <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span>Mark as Sent <span class="text-xs text-gray-400 dark:text-gray-500 font-normal">(no email)</span></span>
+                                </button>
+                            </form>
+                        @endif
+
+                        @if($canCancel || $canDelete)
+                            <div class="border-t border-gray-100 dark:border-gray-700/80 my-1"></div>
+                        @endif
+
+                        @if($canCancel)
+                            <form action="{{ route('invoices.cancel', $invoice) }}" method="POST"
+                                onsubmit="return confirm('Are you sure you want to cancel this invoice?');">
+                                @csrf
+                                <button type="submit"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20 dark:hover:text-amber-300 transition-colors text-left">
+                                    <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                    </svg>
+                                    <span>Cancel Invoice</span>
+                                </button>
+                            </form>
+                        @endif
+
+                        @if($canDelete)
+                            <form action="{{ route('invoices.destroy', $invoice) }}" method="POST"
+                                onsubmit="return confirm('Are you sure you want to delete this invoice?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition-colors text-left">
+                                    <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    <span>Delete Invoice</span>
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 
     <script>
+        (function() {
+            var actionsBtn = document.getElementById('btn-invoice-actions');
+            var actionsMenu = document.getElementById('invoice-actions-menu');
+            var actionsCaret = document.getElementById('invoice-actions-caret');
+
+            if (actionsBtn && actionsMenu) {
+                function openMenu() {
+                    actionsMenu.classList.remove('hidden');
+                    actionsBtn.setAttribute('aria-expanded', 'true');
+                    if (actionsCaret) actionsCaret.classList.add('rotate-180');
+                }
+
+                function closeMenu() {
+                    actionsMenu.classList.add('hidden');
+                    actionsBtn.setAttribute('aria-expanded', 'false');
+                    if (actionsCaret) actionsCaret.classList.remove('rotate-180');
+                }
+
+                actionsBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var isOpen = !actionsMenu.classList.contains('hidden');
+                    if (isOpen) {
+                        closeMenu();
+                    } else {
+                        openMenu();
+                    }
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!actionsMenu.contains(e.target) && !actionsBtn.contains(e.target)) {
+                        closeMenu();
+                    }
+                });
+
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        closeMenu();
+                    }
+                });
+            }
+        })();
+
         function confirmInvoiceEmail(form, message) {
             if (!confirm(message)) {
                 return false;
@@ -83,7 +184,7 @@
             var btn = form.querySelector('button[type="submit"]');
             if (btn) {
                 btn.disabled = true;
-                btn.textContent = 'Sending...';
+                btn.textContent = 'Queueing...';
             }
             return true;
         }
@@ -118,6 +219,9 @@
                     @if($invoice->customer->company)
                         <p class="text-gray-600 text-sm dark:text-gray-400">{{ $invoice->customer->company }}</p>
                     @endif
+                    @if($invoice->brand)
+                        <p class="text-sm font-medium text-blue-600 dark:text-blue-400"><span class="text-gray-500 dark:text-gray-400 font-normal">Brand:</span> {{ $invoice->brand }}</p>
+                    @endif
                     @if($invoice->customer->address)
                         <p class="text-gray-600 text-sm whitespace-pre-line dark:text-gray-400">
                             {{ $invoice->customer->address }}</p>
@@ -133,6 +237,12 @@
                         <span class="text-gray-600 dark:text-gray-400">Invoice Number:</span>
                         <span class="text-gray-900 font-semibold dark:text-gray-200">{{ $invoice->invoice_number }}</span>
                     </div>
+                    @if($invoice->brand)
+                    <div class="flex justify-between items-center py-0.5">
+                        <span class="text-gray-600 dark:text-gray-400">Brand:</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">{{ $invoice->brand }}</span>
+                    </div>
+                    @endif
                     <div class="flex justify-between">
                         <span class="text-gray-600 dark:text-gray-400">Invoice Date:</span>
                         <span
@@ -382,9 +492,4 @@
         </div>
     @endif
 
-    <div class="mt-6">
-        <a href="{{ route('invoices.index') }}"
-            class="text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors dark:text-gray-400 dark:hover:text-gray-200">←
-            Back to Invoices</a>
-    </div>
 @endsection

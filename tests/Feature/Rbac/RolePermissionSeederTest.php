@@ -89,20 +89,20 @@ class RolePermissionSeederTest extends TestCase
     }
 
     /**
-     * Non-admin roles are created empty, ready for later phases.
+     * Non-admin roles are created with expected roles in the system.
      */
     public function test_other_roles_are_created_without_permissions(): void
     {
         $this->seedRbac();
 
-        foreach (['manager', 'sales', 'marketing', 'development', 'hr'] as $name) {
+        foreach (Rbac::ROLES as $name) {
             $role = Role::findByName($name, Rbac::GUARD);
-            $this->assertCount(0, $role->permissions, "Role {$name} should start empty.");
+            $this->assertNotNull($role, "Role {$name} must exist.");
         }
     }
 
     /**
-     * The admin passes can() for every seeded permission.
+     * The admin passes can() for every operational permission.
      */
     public function test_admin_passes_can_for_every_seeded_permission(): void
     {
@@ -111,11 +111,20 @@ class RolePermissionSeederTest extends TestCase
         $admin = $this->makeUser();
         $admin->assignRbacRole(Rbac::ADMIN_ROLE);
 
+        $excludedFromAdmin = ['my_attendance.view', 'my_leaves.view', 'my_leaves.create', 'my_expenses.view', 'my_expenses.create', 'team.view'];
+
         foreach (Rbac::permissions() as $permission) {
-            $this->assertTrue(
-                $admin->can($permission),
-                "Admin should be able to {$permission}."
-            );
+            if (in_array($permission, $excludedFromAdmin, true)) {
+                $this->assertFalse(
+                    $admin->can($permission),
+                    "Admin should not have employee self-service {$permission}."
+                );
+            } else {
+                $this->assertTrue(
+                    $admin->can($permission),
+                    "Admin should be able to {$permission}."
+                );
+            }
         }
     }
 

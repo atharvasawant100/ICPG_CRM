@@ -22,7 +22,22 @@ class RoleController extends Controller
     {
         $this->authorizePermission('roles.view');
 
-        $roles = Role::orderBy('name')->get()->map(function (Role $role) {
+        $roleOrder = [
+            'admin' => 1,
+            'sales_manager' => 2,
+            'marketing_manager' => 3,
+            'development_manager' => 4,
+            'hr_manager' => 5,
+            'sales' => 6,
+            'marketing' => 7,
+            'development' => 8,
+            'hr' => 9,
+            'manager' => 10,
+        ];
+
+        $roles = Role::get()->sortBy(function (Role $role) use ($roleOrder) {
+            return $roleOrder[$role->name] ?? 99;
+        })->values()->map(function (Role $role) {
             return [
                 'model' => $role,
                 'users_count' => $role->users()->count(),
@@ -67,9 +82,15 @@ class RoleController extends Controller
         $matrix = $this->matrix();
         $valid = [];
 
+        // Read the nested array directly: actions such as "notes.create" contain
+        // a dot, which dot-notation lookups would split into another level.
+        $submitted = (array) $request->input('permissions', []);
+
         foreach ($matrix as $module => $actions) {
+            $moduleInput = (array) ($submitted[$module] ?? []);
+
             foreach ($actions as $action => $permissionName) {
-                if ($request->boolean("permissions.{$module}.{$action}")) {
+                if (filter_var($moduleInput[$action] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                     $valid[] = $permissionName;
                 }
             }
@@ -80,6 +101,11 @@ class RoleController extends Controller
         // Only sync permissions that actually exist, so a hand-crafted request
         // cannot invent one.
         $valid = array_values(array_intersect($valid, Rbac::permissions()));
+
+        // Spatie resolves names to ids from its cache. If the permissions table
+        // was reseeded or imported, cached ids can point at rows that no longer
+        // exist and the pivot insert fails its foreign key. Resolve fresh.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $role->syncPermissions($valid);
 

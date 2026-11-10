@@ -97,22 +97,41 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <a href="{{ route('recurring-invoices.show', $template) }}"
-                                    class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3 font-semibold">View</a>
-@can('recurring_invoices.edit')
-                                <a href="{{ route('recurring-invoices.edit', $template) }}"
-                                    class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3 font-semibold">Edit</a>
-@endcan
-@can('recurring_invoices.toggle')
-                                <form action="{{ route('recurring-invoices.toggle', $template) }}" method="POST" class="inline"
-                                    onsubmit="return confirm('Are you sure you want to {{ $template->is_active ? 'deactivate' : 'activate' }} this template?');">
-                                    @csrf
-                                    <button type="submit"
-                                        class="text-{{ $template->is_active ? 'orange' : 'green' }}-600 dark:text-{{ $template->is_active ? 'orange' : 'green' }}-400 hover:text-{{ $template->is_active ? 'orange' : 'green' }}-800 dark:hover:text-{{ $template->is_active ? 'orange' : 'green' }}-300 font-semibold">
-                                        {{ $template->is_active ? 'Deactivate' : 'Activate' }}
-                                    </button>
-                                </form>
-@endcan
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <a href="{{ route('recurring-invoices.show', $template) }}"
+                                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 transition-colors">
+                                        View
+                                    </a>
+                                    @can('recurring_invoices.edit')
+                                        <a href="{{ route('recurring-invoices.edit', $template) }}"
+                                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">
+                                            Edit
+                                        </a>
+                                    @endcan
+                                    @if($template->is_active)
+                                        @can('recurring_invoices.edit')
+                                            <form action="{{ route('recurring-invoices.generate', $template) }}" method="POST" class="inline"
+                                                onsubmit="return confirm('Generate an invoice immediately for &quot;{{ addslashes($template->name) }}&quot; and send the invoice email to the customer?');">
+                                                @csrf
+                                                <button type="submit"
+                                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold {{ $isDue ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-900/60' }} transition-colors"
+                                                    title="Generate invoice and send email now">
+                                                    ⚡ Generate
+                                                </button>
+                                            </form>
+                                        @endcan
+                                    @endif
+                                    @can('recurring_invoices.toggle')
+                                        <form action="{{ route('recurring-invoices.toggle', $template) }}" method="POST" class="inline"
+                                            onsubmit="return confirm('Are you sure you want to {{ $template->is_active ? 'deactivate' : 'activate' }} this template?');">
+                                            @csrf
+                                            <button type="submit"
+                                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold {{ $template->is_active ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60' : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60' }} transition-colors">
+                                                {{ $template->is_active ? 'Deactivate' : 'Activate' }}
+                                            </button>
+                                        </form>
+                                    @endcan
+                                </div>
                             </td>
                         </tr>
                     @empty
@@ -156,11 +175,23 @@
                             ₹{{ number_format($template->subtotal + $template->tax_amount - $template->discount_amount, 2) }}
                         </p>
                     </div>
-                    <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <div class="flex flex-wrap gap-1.5 pt-2 border-t border-gray-200 dark:border-gray-600">
                         <a href="{{ route('recurring-invoices.show', $template) }}"
-                            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-semibold">View</a>
-                        <a href="{{ route('recurring-invoices.edit', $template) }}"
-                            class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-semibold">Edit</a>
+                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 transition-colors">View</a>
+                        @can('recurring_invoices.edit')
+                            <a href="{{ route('recurring-invoices.edit', $template) }}"
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-colors">Edit</a>
+                        @endcan
+                        @can('recurring_invoices.toggle')
+                            <form action="{{ route('recurring-invoices.toggle', $template) }}" method="POST" class="inline"
+                                onsubmit="return confirm('Are you sure you want to {{ $template->is_active ? 'deactivate' : 'activate' }} this template?');">
+                                @csrf
+                                <button type="submit"
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold {{ $template->is_active ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60' : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60' }} transition-colors">
+                                    {{ $template->is_active ? 'Deactivate' : 'Activate' }}
+                                </button>
+                            </form>
+                        @endcan
                     </div>
                 </div>
             @empty

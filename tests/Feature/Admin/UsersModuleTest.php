@@ -61,7 +61,7 @@ class UsersModuleTest extends RbacTestCase
             'password' => 'secret-password',
             'password_confirmation' => 'secret-password',
             // No role field: the role is derived from department + designation.
-            'designation' => 'software developer',
+            'designation' => 'business executive',
             'department' => 'sales',
         ]);
 
@@ -72,7 +72,7 @@ class UsersModuleTest extends RbacTestCase
 
         $this->assertTrue($created->hasRole('sales'));
         $this->assertSame('sales', $created->getAttribute('role'), 'The mirror must match Spatie.');
-        $this->assertSame('software developer', $created->designation);
+        $this->assertSame('business executive', $created->designation);
     }
 
     public function test_create_rejects_a_duplicate_email(): void
@@ -484,7 +484,7 @@ public function test_a_user_cannot_report_to_themselves(): void
             'email' => 'starter@example.com',
             'password' => 'secret-password',
             'password_confirmation' => 'secret-password',
-            'designation' => 'intern',
+            'designation' => 'hr executive',
             'department' => 'hr',
         ])->assertSessionHasNoErrors();
 
@@ -628,4 +628,256 @@ public function test_a_user_cannot_report_to_themselves(): void
         $this->actingAs($admin)->get('/admin/users?role=sales')
             ->assertSuccessful()->assertSee('Alice Sales')->assertDontSee('Bob Marketing');
     }
+
+    public function test_admin_can_create_a_user_with_auto_generated_emp_id(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post('/admin/users', [
+            'name' => 'Emp One',
+            'email' => 'emp1@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'department' => 'sales',
+            'designation' => 'business executive',
+        ])->assertRedirect(route('admin.users.index'));
+
+        $user1 = User::where('email', 'emp1@example.com')->firstOrFail();
+        $this->assertSame('ICPG_01', $user1->emp_id);
+
+        $this->actingAs($admin)->post('/admin/users', [
+            'name' => 'Emp Two',
+            'email' => 'emp2@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'department' => 'sales',
+            'designation' => 'business executive',
+        ])->assertRedirect(route('admin.users.index'));
+
+        $user2 = User::where('email', 'emp2@example.com')->firstOrFail();
+        $this->assertSame('ICPG_02', $user2->emp_id);
+    }
+
+    public function test_admin_can_create_a_user_with_custom_emp_id(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post('/admin/users', [
+            'emp_id' => 'ICPG_99',
+            'name' => 'Custom Emp',
+            'email' => 'custom@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'department' => 'sales',
+            'designation' => 'business executive',
+        ])->assertRedirect(route('admin.users.index'));
+
+        $user = User::where('email', 'custom@example.com')->firstOrFail();
+        $this->assertSame('ICPG_99', $user->emp_id);
+    }
+
+    public function test_emp_id_must_be_unique(): void
+    {
+        $admin = $this->admin();
+
+        User::factory()->create(['emp_id' => 'ICPG_10']);
+
+        $this->actingAs($admin)->post('/admin/users', [
+            'emp_id' => 'ICPG_10',
+            'name' => 'Duplicate Emp',
+            'email' => 'dup@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'department' => 'sales',
+            'designation' => 'business executive',
+        ])->assertSessionHasErrors('emp_id');
+    }
+
+    public function test_users_index_can_search_by_emp_id(): void
+    {
+        $admin = $this->admin();
+
+        User::factory()->create([
+            'name' => 'Search Target',
+            'email' => 'target@example.com',
+            'emp_id' => 'ICPG_77',
+        ]);
+
+        $this->actingAs($admin)->get('/admin/users?search=ICPG_77')
+            ->assertSuccessful()
+            ->assertSee('Search Target')
+            ->assertSee('ICPG_77');
+    }
+
+    public function test_creating_a_manager_directly_assigns_them_as_department_manager(): void
+    {
+        $admin = $this->admin();
+
+        // Existing staff member in development with no manager yet
+        $existingDev = User::factory()->create([
+            'name' => 'Junior Developer',
+            'email' => 'jr@example.com',
+            'department' => 'development',
+            'designation' => 'software developer',
+            'manager_id' => null,
+        ]);
+
+        $this->actingAs($admin)->post('/admin/users', [
+            'name' => 'New Dev Head',
+            'email' => 'head@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'department' => 'development',
+            'designation' => 'manager',
+        ])->assertSessionHasNoErrors();
+
+        $newManager = User::where('email', 'head@example.com')->firstOrFail();
+        $this->assertTrue($newManager->hasRole('manager'));
+        $this->assertNull($newManager->manager_id);
+
+        // Verify the department's manager_id is now directly this user
+        $department = \App\Models\Department::where('name', 'development')->firstOrFail();
+        $this->assertSame($newManager->id, (int) $department->manager_id);
+
+        // Verify existing staff in development now reports to this new manager
+        $this->assertSame($newManager->id, (int) $existingDev->fresh()->manager_id);
+    }
+
+    public function test_hr_user_can_open_create_form_and_create_user(): void
+    {
+        $hrUser = User::factory()->create([
+            'name' => 'Katrina HR',
+            'department' => 'hr',
+            'designation' => 'hr executive',
+        ]);
+        $hrUser->assignRbacRole('hr');
+
+        // HR opens users index and create form
+        $this->actingAs($hrUser)->get('/admin/users')->assertSuccessful();
+        $this->actingAs($hrUser)->get('/admin/users/create')->assertSuccessful();
+
+        // HR creates a new employee
+        $response = $this->actingAs($hrUser)->post('/admin/users', [
+            'name' => 'Kunal Sharma',
+            'email' => 'kunal@example.com',
+            'password' => 'secret-password',
+            'password_confirmation' => 'secret-password',
+            'department' => 'development',
+            'designation' => 'software developer',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('admin.users.index'));
+
+        $createdUser = User::where('email', 'kunal@example.com')->firstOrFail();
+        $this->assertSame('Kunal Sharma', $createdUser->name);
+        $this->assertSame('development', $createdUser->department);
+        $this->assertTrue($createdUser->hasRole('development'));
+    }
+
+    public function test_admin_can_view_employee_profile(): void
+    {
+        $admin = $this->admin();
+        $employee = User::factory()->create([
+            'emp_id' => 'ICPG_07',
+            'name' => 'Akshata Atharva Sawant',
+            'email' => 'akshu@example.com',
+            'department' => 'sales',
+            'designation' => 'manager',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.users.show', $employee));
+
+        $response->assertSuccessful();
+        $response->assertSee('Akshata Atharva Sawant');
+        $response->assertSee('ICPG_07');
+        $response->assertSee('Sales Department');
+    }
+
+    public function test_admin_departments_page_links_to_employee_profile(): void
+    {
+        $admin = $this->admin();
+        $dept = Department::firstOrCreate(['name' => 'sales'], [
+            'description' => 'Sales and Client Outreach',
+            'is_active' => true,
+        ]);
+        $employee = User::factory()->create([
+            'emp_id' => 'ICPG_07',
+            'name' => 'Akshata Atharva Sawant',
+            'department' => 'sales',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.departments.index'));
+
+        $response->assertSuccessful();
+        $response->assertSee(route('admin.users.show', $employee));
+    }
+
+    public function test_hr_can_view_employee_profile(): void
+    {
+        $hrUser = User::factory()->create([
+            'name' => 'Katrina HR',
+            'department' => 'hr',
+            'designation' => 'hr executive',
+        ]);
+        $hrUser->assignRbacRole('hr');
+
+        $employee = User::factory()->create([
+            'name' => 'Omkar Dev',
+            'department' => 'development',
+        ]);
+
+        $response = $this->actingAs($hrUser)->get(route('admin.users.show', $employee));
+
+        $response->assertSuccessful();
+        $response->assertSee('Omkar Dev');
+    }
+
+    public function test_employee_profile_displays_salary_breakdown_and_attendance(): void
+    {
+        $admin = $this->admin();
+        $employee = User::factory()->create([
+            'emp_id' => 'ICPG_99',
+            'name' => 'Deepak Verma',
+            'department' => 'development',
+            'designation' => 'software developer',
+        ]);
+
+        \App\Models\EmployeeSalary::create([
+            'user_id' => $employee->id,
+            'basic_salary' => 25000,
+            'hra' => 10000,
+            'conveyance_allowance' => 2000,
+            'special_allowance' => 3000,
+            'other_allowances' => 0,
+            'gross_salary' => 40000,
+            'provident_fund' => 1800,
+            'professional_tax' => 200,
+            'tds' => 500,
+            'other_deductions' => 0,
+            'total_deductions' => 2500,
+            'net_salary' => 37500,
+            'approval_status' => 'approved',
+        ]);
+
+        \App\Models\Attendance::create([
+            'user_id' => $employee->id,
+            'date' => \Carbon\Carbon::today()->toDateString(),
+            'check_in' => '09:30:00',
+            'check_out' => '18:30:00',
+            'total_minutes' => 540,
+            'status' => 'present',
+            'method' => 'web',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.users.show', $employee));
+
+        $response->assertSuccessful();
+        $response->assertSee('Deepak Verma');
+        $response->assertSee('40,000.00'); // Gross
+        $response->assertSee('37,500.00'); // Net
+        $response->assertSee('2,500.00');  // Deductions
+        $response->assertSee('Approved Structure');
+    }
 }
+

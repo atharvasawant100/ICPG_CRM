@@ -2,6 +2,12 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\BrandController;
+use App\Http\Controllers\SocialAccountController;
+use App\Http\Controllers\ContentCalendarController;
+use App\Http\Controllers\ContentPostController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseApprovalController;
@@ -13,8 +19,11 @@ use App\Http\Controllers\LeadFollowupController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\EmployeeSalaryController;
 use App\Http\Controllers\RecurringInvoiceTemplateController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SalesTrackingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Mail;
@@ -39,10 +48,26 @@ Route::get('/test-email', function () {
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
 
+// Password reset routes (OTP based via no-reply@iconicpages.com)
+Route::get('/forgot-password', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
+Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetOtpEmail'])->name('password.email');
+Route::post('/forgot-password/resend', [ForgotPasswordController::class, 'resendOtp'])->name('password.resend');
+Route::get('/reset-password', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
+Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword'])->name('password.update');
+
 // Redirect root to login
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+// Fallback avatar image route (ensures avatar images always load with proper headers)
+Route::get('/storage/avatars/{filename}', function (string $filename) {
+    $path = 'avatars/' . $filename;
+    if (! \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+        abort(404);
+    }
+    return \Illuminate\Support\Facades\Storage::disk('public')->response($path);
+})->where('filename', '[A-Za-z0-9_\-\.]+')->name('avatar.serve');
 
 /*
 |--------------------------------------------------------------------------
@@ -73,6 +98,86 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 
+    // Avatar photo management (Self, HR, and Admin)
+    Route::post('/users/{user}/avatar', [\App\Http\Controllers\UserAvatarController::class, 'update'])
+        ->name('users.avatar.update');
+    Route::delete('/users/{user}/avatar', [\App\Http\Controllers\UserAvatarController::class, 'destroy'])
+        ->name('users.avatar.destroy');
+    Route::post('/profile/avatar', function (\Illuminate\Http\Request $request) {
+        return app(\App\Http\Controllers\UserAvatarController::class)->update($request, $request->user());
+    })->name('profile.avatar.update');
+    Route::delete('/profile/avatar', function (\Illuminate\Http\Request $request) {
+        return app(\App\Http\Controllers\UserAvatarController::class)->destroy($request, $request->user());
+    })->name('profile.avatar.destroy');
+
+    // Attendance punch in & punch out (available to all staff)
+    Route::post('/attendance/punch-in', [\App\Http\Controllers\AttendancePunchController::class, 'punchIn'])
+        ->name('attendance.punch-in');
+    Route::post('/attendance/punch-out', [\App\Http\Controllers\AttendancePunchController::class, 'punchOut'])
+        ->name('attendance.punch-out');
+    Route::post('/attendance/tab-close-logout', [\App\Http\Controllers\AttendancePunchController::class, 'tabCloseLogout'])
+        ->name('attendance.tab-close-logout');
+    Route::post('/attendance/heartbeat', [\App\Http\Controllers\AttendancePunchController::class, 'heartbeat'])
+        ->name('attendance.heartbeat');
+
+    // ---- Employee Self-Service: My Attendance & My Leaves -------------------
+    Route::get('/my-attendance', function (\Illuminate\Http\Request $request) {
+        if ($request->user()?->isAdmin()) {
+            return redirect()->route('admin.attendance.index')->with('info', 'Admin accounts do not track personal attendance.');
+        }
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('my_attendance.view'), 403);
+        return app(\App\Http\Controllers\Employee\MyAttendanceController::class)->index($request);
+    })->name('my-attendance.index');
+
+    Route::get('/my-leaves', function (\Illuminate\Http\Request $request) {
+        if ($request->user()?->isAdmin()) {
+            return redirect()->route('admin.leaves.index')->with('info', 'Admin accounts do not have personal leave allocations.');
+        }
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('my_leaves.view'), 403);
+        return app(\App\Http\Controllers\Employee\MyLeaveController::class)->index($request);
+    })->name('my-leaves.index');
+
+    Route::post('/my-leaves', function (\Illuminate\Http\Request $request) {
+        if ($request->user()?->isAdmin()) {
+            return redirect()->route('admin.leaves.index')->with('info', 'Admin accounts do not apply for leaves.');
+        }
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('my_leaves.create'), 403);
+        return app(\App\Http\Controllers\Employee\MyLeaveController::class)->store($request);
+    })->name('my-leaves.store');
+
+    // ---- Employee Self-Service: My Expenses (Reimbursement Requests) --------
+    Route::get('/my-expenses', function (\Illuminate\Http\Request $request) {
+        if ($request->user()?->isAdmin()) {
+            return redirect()->route('expenses.index')->with('info', 'Admin accounts review and manage organization expenses.');
+        }
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('my_expenses.view'), 403);
+        return app(\App\Http\Controllers\Employee\MyExpenseController::class)->index($request);
+    })->name('my-expenses.index');
+
+    Route::post('/my-expenses', function (\Illuminate\Http\Request $request) {
+        if ($request->user()?->isAdmin()) {
+            return redirect()->route('expenses.index')->with('info', 'Admin accounts do not submit personal reimbursement requests.');
+        }
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('my_expenses.create'), 403);
+        return app(\App\Http\Controllers\Employee\MyExpenseController::class)->store($request);
+    })->name('my-expenses.store');
+
+    Route::delete('/my-expenses/{expense}', function (\App\Models\Expense $expense, \Illuminate\Http\Request $request) {
+        if ($request->user()?->isAdmin()) {
+            return redirect()->route('expenses.index');
+        }
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('my_expenses.view'), 403);
+        return app(\App\Http\Controllers\Employee\MyExpenseController::class)->destroy($expense, $request);
+    })->name('my-expenses.destroy');
+
+    // ---- Notifications ----------------------------------------------------
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::post('/notifications/mark-all-as-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.mark-all-as-read');
+    Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy'])
+        ->name('notifications.destroy');
+
     Route::post('/notifications/{id}/mark-as-read', function ($id) {
         $notification = auth()->user()->notifications()->findOrFail($id);
         $notification->markAsRead();
@@ -80,15 +185,25 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     })->name('notifications.mark-as-read');
 
     // Poll: dispatch due follow-up reminders and return fresh unread notifications
-    Route::get('/notifications/poll', function (\App\Services\FollowupReminderService $reminders) {
+    Route::get('/notifications/poll', function (\App\Services\FollowupReminderService $reminders, \App\Services\NotificationFeed $feed) {
         $reminders->dispatchDueReminders();
 
+        // Check overdue tasks (throttled every 5 minutes during web sessions)
+        if (\Illuminate\Support\Facades\Cache::add('last_task_overdue_poll_check', true, now()->addMinutes(5))) {
+            try {
+                app(\App\Services\TaskOverdueService::class)->checkAndDispatchOverdueNotifications();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Task overdue poll check error: ' . $e->getMessage());
+            }
+        }
+
         $user = auth()->user();
-        $unread = $user->unreadNotifications()->latest()->limit(10)->get();
-        $upcomingCount = \App\Models\RecurringInvoiceTemplate::active()
-            ->where('next_generation_date', '<=', \Carbon\Carbon::today()->addDays(3))
-            ->count();
-        $unreadCount = $user->unreadNotifications()->count();
+
+        // The feed decides what this user may see. An employee only ever gets
+        // task assignments and leave approvals.
+        $unread = $feed->unread($user, 10);
+        $unreadCount = $feed->unreadCount($user);
+        $upcomingCount = $feed->upcomingCount($user);
 
         return response()->json([
             'unread_count' => $unreadCount,
@@ -108,6 +223,93 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard');
+
+    // ---- Team (Managers & Supervised Views) ---------------------------------
+    Route::get('/team', [\App\Http\Controllers\TeamController::class, 'index'])
+        ->middleware('permission:team.view')
+        ->name('team.index');
+    Route::get('/team/{user}', [\App\Http\Controllers\TeamController::class, 'show'])
+        ->middleware('permission:team.view')
+        ->name('team.show');
+
+    // ---- Task Pool & Daily Tasks --------------------------------------------
+    Route::get('/tasks/my-active', [\App\Http\Controllers\TaskController::class, 'myActiveTasks'])
+        ->name('tasks.my-active');
+    Route::get('/tasks', [\App\Http\Controllers\TaskController::class, 'index'])
+        ->name('tasks.index');
+    Route::post('/tasks', [\App\Http\Controllers\TaskController::class, 'store'])
+        ->name('tasks.store');
+    Route::get('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'show'])
+        ->name('tasks.show');
+    Route::match(['put', 'patch'], '/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])
+        ->name('tasks.update');
+    Route::post('/tasks/{task}/toggle', [\App\Http\Controllers\TaskController::class, 'toggleComplete'])
+        ->name('tasks.toggle');
+    Route::patch('/tasks/{task}/status', [\App\Http\Controllers\TaskController::class, 'updateStatus'])
+        ->name('tasks.status');
+    Route::post('/tasks/{task}/delegate', [\App\Http\Controllers\TaskController::class, 'delegate'])
+        ->name('tasks.delegate');
+    Route::post('/tasks/{task}/escalate', [\App\Http\Controllers\TaskController::class, 'escalate'])
+        ->name('tasks.escalate');
+    Route::post('/tasks/{task}/rework', [\App\Http\Controllers\TaskController::class, 'rework'])
+        ->name('tasks.rework');
+
+    // ---- Task Collaboration, Help Requests, Comments, Attachments & Reviews --
+    Route::post('/tasks/{task}/help-requests', [\App\Http\Controllers\TaskController::class, 'requestHelp'])
+        ->name('tasks.help-requests.store');
+    Route::post('/tasks/{task}/help-requests/{helpRequest}/respond', [\App\Http\Controllers\TaskController::class, 'respondHelp'])
+        ->name('tasks.help-requests.respond');
+    Route::post('/tasks/{task}/collaborators', [\App\Http\Controllers\TaskController::class, 'addCollaborator'])
+        ->name('tasks.collaborators.store');
+    Route::delete('/tasks/{task}/collaborators/{collaborator}', [\App\Http\Controllers\TaskController::class, 'removeCollaborator'])
+        ->name('tasks.collaborators.destroy');
+    Route::post('/tasks/{task}/comments', [\App\Http\Controllers\TaskController::class, 'addComment'])
+        ->name('tasks.comments.store');
+    Route::delete('/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskController::class, 'deleteComment'])
+        ->name('tasks.comments.destroy');
+    Route::post('/tasks/{task}/attachments', [\App\Http\Controllers\TaskController::class, 'uploadAttachment'])
+        ->name('tasks.attachments.store');
+    Route::get('/tasks/{task}/attachments/{attachment}/download', [\App\Http\Controllers\TaskController::class, 'downloadAttachment'])
+        ->name('tasks.attachments.download');
+    Route::delete('/tasks/{task}/attachments/{attachment}', [\App\Http\Controllers\TaskController::class, 'deleteAttachment'])
+        ->name('tasks.attachments.destroy');
+    Route::post('/tasks/{task}/review/submit', [\App\Http\Controllers\TaskController::class, 'submitForReview'])
+        ->name('tasks.review.submit');
+    Route::post('/tasks/{task}/review/decide', [\App\Http\Controllers\TaskController::class, 'decideReview'])
+        ->name('tasks.review.decide');
+
+    Route::delete('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])
+        ->name('tasks.destroy');
+
+    // ---- Confidential Internal Grievances & Direct Admin Tickets ------------
+    Route::get('/tickets', [\App\Http\Controllers\InternalTicketController::class, 'index'])
+        ->name('tickets.index');
+    Route::get('/tickets/create', [\App\Http\Controllers\InternalTicketController::class, 'create'])
+        ->name('tickets.create');
+    Route::post('/tickets', [\App\Http\Controllers\InternalTicketController::class, 'store'])
+        ->name('tickets.store');
+    Route::get('/tickets/{ticket}', [\App\Http\Controllers\InternalTicketController::class, 'show'])
+        ->name('tickets.show');
+    Route::post('/tickets/{ticket}/reply', [\App\Http\Controllers\InternalTicketController::class, 'reply'])
+        ->name('tickets.reply');
+    Route::post('/tickets/{ticket}/resolve', [\App\Http\Controllers\InternalTicketController::class, 'resolve'])
+        ->name('tickets.resolve');
+    Route::get('/tickets/{ticket}/attachments/{attachment}/download', [\App\Http\Controllers\InternalTicketController::class, 'downloadAttachment'])
+        ->name('tickets.attachments.download');
+
+    // ---- Manager Performance Tracking & Monthly Report ----------------------
+    Route::get('/reports/performance', [\App\Http\Controllers\PerformanceReportController::class, 'index'])
+        ->name('reports.performance');
+
+    // ---- Projects ------------------------------------------------------------
+    Route::get('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'show'])
+        ->name('projects.show');
+    Route::post('/projects', [\App\Http\Controllers\ProjectController::class, 'store'])
+        ->name('projects.store');
+    Route::match(['put', 'patch'], '/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'update'])
+        ->name('projects.update');
+    Route::delete('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'destroy'])
+        ->name('projects.destroy');
 
     // ---- Customers ----------------------------------------------------------
     Route::get('customer', function (Request $request) {
@@ -137,6 +339,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])
         ->middleware('permission:customers.delete')->name('customers.destroy');
 
+    // ---- Sales Tracking -----------------------------------------------------
+    Route::get('sales-tracking', [SalesTrackingController::class, 'index'])
+        ->middleware('permission:sales_tracking.view')->name('sales-tracking.index');
+
     // ---- Leads: concrete paths before the parameterized ones ---------------
     Route::get('leads/', function (Request $request) {
         return redirect()->route('leads.index', $request->query());
@@ -159,6 +365,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('leads/create/bulk/template', [LeadController::class, 'downloadTemplate'])
         ->middleware('permission:leads.import')->name('leads.bulk-import.template');
 
+    Route::get('leads/bulk-reassign', fn () => redirect()->route('leads.index'));
+    Route::post('leads/bulk-reassign', [LeadController::class, 'bulkReassign'])
+        ->middleware('permission:leads.reassign')->name('leads.bulk-reassign');
+    Route::get('leads/bulk-distribute', fn () => redirect()->route('leads.index'));
+    Route::post('leads/bulk-distribute', [LeadController::class, 'bulkDistribute'])
+        ->middleware('permission:leads.reassign')->name('leads.bulk-distribute');
+
     Route::get('leads/dashboard/stats', [LeadController::class, 'dashboard'])
         ->middleware('permission:leads.view')->name('leads.dashboard');
     Route::get('leads/trash/list', [LeadController::class, 'trash'])
@@ -174,6 +387,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:leads.edit')->name('leads.edit');
     Route::match(['put', 'patch'], 'leads/{lead}', [LeadController::class, 'update'])
         ->middleware('permission:leads.edit')->name('leads.update');
+    Route::patch('leads/{lead}/status', [LeadController::class, 'updateStatus'])
+        ->middleware('permission:leads.edit')->name('leads.status.update');
+    Route::get('leads/{lead}/reassign', fn (\App\Models\Lead $lead) => redirect()->route('leads.show', $lead));
+    Route::post('leads/{lead}/reassign', [LeadController::class, 'reassign'])
+        ->middleware('permission:leads.reassign')->name('leads.reassign');
     Route::delete('leads/{lead}', [LeadController::class, 'destroy'])
         ->middleware('permission:leads.delete')->name('leads.destroy');
 
@@ -197,6 +415,14 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:followups.edit')->name('leads.followups.update');
     Route::post('leads/{lead}/followups/{followup}/complete', [LeadFollowupController::class, 'complete'])
         ->middleware('permission:followups.edit')->name('leads.followups.complete');
+    Route::post('followups/{followup}/reschedule', [LeadFollowupController::class, 'reschedule'])
+        ->middleware('permission:followups.edit')->name('followups.reschedule');
+    Route::post('leads/{lead}/followups/{followup}/reschedule', [LeadFollowupController::class, 'reschedule'])
+        ->middleware('permission:followups.edit')->name('leads.followups.reschedule');
+    Route::post('followups/{followup}/cancel', [LeadFollowupController::class, 'cancel'])
+        ->middleware('permission:followups.edit')->name('followups.cancel');
+    Route::post('leads/{lead}/followups/{followup}/cancel', [LeadFollowupController::class, 'cancel'])
+        ->middleware('permission:followups.edit')->name('leads.followups.cancel');
     Route::delete('leads/{lead}/followups/{followup}', [LeadFollowupController::class, 'destroy'])
         ->middleware('permission:followups.delete')->name('leads.followups.destroy');
 
@@ -292,6 +518,40 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             ->middleware('permission:recurring_invoices.delete')->name('destroy');
         Route::post('/{template}/toggle', [RecurringInvoiceTemplateController::class, 'toggle'])
             ->middleware('permission:recurring_invoices.toggle')->name('toggle');
+        Route::post('/{template}/generate', [RecurringInvoiceTemplateController::class, 'generate'])
+            ->middleware('permission:recurring_invoices.edit')->name('generate');
+    });
+
+    // ---- Payroll ------------------------------------------------------------
+    Route::prefix('payrolls')->name('payrolls.')->group(function () {
+        Route::get('/', [PayrollController::class, 'index'])
+            ->middleware('permission:payroll.view')->name('index');
+        Route::get('/create', [PayrollController::class, 'create'])
+            ->middleware('permission:payroll.create')->name('create');
+        Route::post('/', [PayrollController::class, 'store'])
+            ->middleware('permission:payroll.create')->name('store');
+        Route::get('/{payroll}', [PayrollController::class, 'show'])
+            ->middleware('permission:payroll.view')->name('show');
+        Route::get('/{payroll}/edit', [PayrollController::class, 'edit'])
+            ->middleware('permission:payroll.edit')->name('edit');
+        Route::put('/{payroll}', [PayrollController::class, 'update'])
+            ->middleware('permission:payroll.edit')->name('update');
+        Route::delete('/{payroll}', [PayrollController::class, 'destroy'])
+            ->middleware('permission:payroll.delete')->name('destroy');
+        Route::get('/{payroll}/pdf', [PayrollController::class, 'pdf'])
+            ->middleware('permission:payroll.view')->name('pdf');
+        Route::post('/{payroll}/pay', [PayrollController::class, 'markAsPaid'])
+            ->middleware('permission:payroll.edit')->name('pay');
+    });
+
+    // ---- Employee Salary Structures -----------------------------------------
+    Route::prefix('employee-salaries')->name('employee-salaries.')->group(function () {
+        Route::get('/', [EmployeeSalaryController::class, 'index'])
+            ->middleware('permission:payroll.view')->name('index');
+        Route::get('/{user}/edit', [EmployeeSalaryController::class, 'edit'])
+            ->middleware('permission:payroll.edit')->name('edit');
+        Route::put('/{user}', [EmployeeSalaryController::class, 'update'])
+            ->middleware('permission:payroll.edit')->name('update');
     });
 
     // ---- Admin modules ------------------------------------------------------
@@ -313,4 +573,66 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:services.edit')->name('services.update');
     Route::delete('services/{service}', [ServiceController::class, 'destroy'])
         ->middleware('permission:services.delete')->name('services.destroy');
+
+    // ---- Social Media Content Calendar & Brands -----------------------------
+    Route::prefix('content')->name('content.')->group(function () {
+        Route::get('/dashboard', [ContentCalendarController::class, 'dashboard'])
+            ->middleware('permission:content.view')->name('dashboard');
+        Route::get('/calendar', [ContentCalendarController::class, 'calendar'])
+            ->middleware('permission:content.view')->name('calendar');
+        Route::get('/calendar/feed', [ContentCalendarController::class, 'feed'])
+            ->middleware('permission:content.view')->name('calendar.feed');
+        Route::get('/queue', [ContentCalendarController::class, 'queue'])
+            ->middleware('permission:content.publish')->name('queue');
+
+        // Posts CRUD
+        Route::get('/posts', [ContentPostController::class, 'index'])
+            ->middleware('permission:content.view')->name('posts.index');
+        Route::get('/posts/create', [ContentPostController::class, 'create'])
+            ->middleware('permission:content.create')->name('posts.create');
+        Route::post('/posts', [ContentPostController::class, 'store'])
+            ->middleware('permission:content.create')->name('posts.store');
+        Route::get('/posts/{post}', [ContentPostController::class, 'show'])
+            ->middleware('permission:content.view')->name('posts.show');
+        Route::get('/posts/{post}/edit', [ContentPostController::class, 'edit'])
+            ->middleware('permission:content.edit')->name('posts.edit');
+        Route::match(['put', 'patch'], '/posts/{post}', [ContentPostController::class, 'update'])
+            ->middleware('permission:content.edit')->name('posts.update');
+        Route::delete('/posts/{post}', [ContentPostController::class, 'destroy'])
+            ->middleware('permission:content.delete')->name('posts.destroy');
+
+        // Post workflow actions
+        Route::patch('/posts/{post}/reschedule', [ContentPostController::class, 'reschedule'])
+            ->middleware('permission:content.edit')->name('posts.reschedule');
+        Route::post('/posts/{post}/media', [ContentPostController::class, 'uploadMedia'])
+            ->middleware('permission:content.edit')->name('posts.media.upload');
+        Route::delete('/posts/{post}/media/{media}', [ContentPostController::class, 'deleteMedia'])
+            ->middleware('permission:content.edit')->name('posts.media.delete');
+        Route::get('/posts/{post}/media/{media}/download', [ContentPostController::class, 'downloadMedia'])
+            ->middleware('permission:content.view')->name('posts.media.download');
+
+        Route::post('/posts/{post}/submit-review', [ContentPostController::class, 'submitReview'])
+            ->middleware('permission:content.edit')->name('posts.submit-review');
+        Route::post('/posts/{post}/decide-review', [ContentPostController::class, 'decideReview'])
+            ->middleware('permission:content.review')->name('posts.decide-review');
+        Route::post('/posts/{post}/publish', [ContentPostController::class, 'publish'])
+            ->middleware('permission:content.publish')->name('posts.publish');
+        Route::post('/posts/{post}/fail', [ContentPostController::class, 'fail'])
+            ->middleware('permission:content.publish')->name('posts.fail');
+
+        // Task integration
+        Route::post('/posts/{post}/tasks', [ContentPostController::class, 'createLinkedTask'])
+            ->middleware('permission:content.assign')->name('posts.tasks.store');
+    });
+
+    // Brands CRUD
+    Route::resource('brands', BrandController::class);
+
+    // Social Accounts
+    Route::post('social-accounts', [SocialAccountController::class, 'store'])
+        ->middleware('permission:content.accounts')->name('social-accounts.store');
+    Route::match(['put', 'patch'], 'social-accounts/{socialAccount}', [SocialAccountController::class, 'update'])
+        ->middleware('permission:content.accounts')->name('social-accounts.update');
+    Route::delete('social-accounts/{socialAccount}', [SocialAccountController::class, 'destroy'])
+        ->middleware('permission:content.accounts')->name('social-accounts.destroy');
 });

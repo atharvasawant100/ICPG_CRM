@@ -48,6 +48,39 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        'payroll_smtp' => [
+            'transport' => 'smtp',
+            'host' => env('MAIL_PAYROLL_HOST', env('MAIL_HOST', 'smtp.hostinger.com')),
+            'port' => env('MAIL_PAYROLL_PORT', env('MAIL_PORT', 465)),
+            'encryption' => env('MAIL_PAYROLL_ENCRYPTION', env('MAIL_ENCRYPTION', 'ssl')),
+            'username' => env('MAIL_PAYROLL_USERNAME', 'payroll@iconicpages.com'),
+            'password' => env('MAIL_PAYROLL_PASSWORD', env('MAIL_PASSWORD')),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'billing_smtp' => [
+            'transport' => 'smtp',
+            'host' => env('MAIL_BILLING_HOST', env('MAIL_HOST', 'smtp.hostinger.com')),
+            'port' => env('MAIL_BILLING_PORT', env('MAIL_PORT', 465)),
+            'encryption' => env('MAIL_BILLING_ENCRYPTION', env('MAIL_ENCRYPTION', 'ssl')),
+            'username' => env('MAIL_BILLING_USERNAME', 'billing@iconicpages.com'),
+            'password' => env('MAIL_BILLING_PASSWORD', env('MAIL_PASSWORD')),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'hr_smtp' => [
+            'transport' => 'smtp',
+            'host' => env('MAIL_HR_HOST', env('MAIL_HOST', 'smtp.hostinger.com')),
+            'port' => env('MAIL_HR_PORT', env('MAIL_PORT', 465)),
+            'encryption' => env('MAIL_HR_ENCRYPTION', env('MAIL_ENCRYPTION', 'ssl')),
+            'username' => env('MAIL_HR_USERNAME', 'hr@iconicpages.com'),
+            'password' => env('MAIL_HR_PASSWORD', env('MAIL_PASSWORD')),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],
@@ -112,6 +145,36 @@ return [
     'from' => [
         'address' => env('MAIL_FROM_ADDRESS', 'no-reply@iconicpages.com'),
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'ICPG Office')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payroll sender
+    |--------------------------------------------------------------------------
+    |
+    | Payslips go out from a dedicated address so an employee replying to their
+    | salary slip reaches payroll rather than the no-reply inbox. The SMTP host
+    | still authenticates as MAIL_USERNAME, so this must be an address the
+    | provider will accept for that account.
+    |
+    */
+
+    'payroll_from' => [
+        'address' => env('MAIL_PAYROLL_FROM', 'payroll@iconicpages.com'),
+        'name' => env('MAIL_PAYROLL_FROM_NAME', 'ICPG Payroll'),
+        'reply_to' => env('MAIL_PAYROLL_REPLY_TO', 'payroll@iconicpages.com'),
+    ],
+
+    'billing_from' => [
+        'address' => env('MAIL_BILLING_FROM', 'billing@iconicpages.com'),
+        'name' => env('MAIL_BILLING_FROM_NAME', env('APP_NAME', 'ICPG Technologies Pvt Ltd')),
+        'reply_to' => env('MAIL_BILLING_REPLY_TO', 'billing@iconicpages.com'),
+    ],
+
+    'hr_from' => [
+        'address' => env('MAIL_HR_FROM', 'hr@iconicpages.com'),
+        'name' => env('MAIL_HR_FROM_NAME', 'ICPG HR Department'),
+        'reply_to' => env('MAIL_HR_REPLY_TO', 'hr@iconicpages.com'),
     ],
 
 ];

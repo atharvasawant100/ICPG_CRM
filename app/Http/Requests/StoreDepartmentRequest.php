@@ -38,6 +38,7 @@ class StoreDepartmentRequest extends FormRequest
              | rather than ordinary use.
              */
             'manager_id' => ['required', 'integer', Rule::exists('users', 'id')],
+            'designations' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -70,7 +71,7 @@ class StoreDepartmentRequest extends FormRequest
             // Same rule as the Users page Manager dropdown: only active admins
             // and managers may head a department.
             $isEligible = $manager->is_active
-                && ($manager->hasRole(Rbac::ADMIN_ROLE) || $manager->hasRole('manager'));
+                && ($manager->hasRole(Rbac::ADMIN_ROLE) || $manager->isManager());
 
             if (! $isEligible) {
                 $validator->errors()->add(

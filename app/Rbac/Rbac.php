@@ -36,21 +36,48 @@ final class Rbac
     ];
 
     /**
-     * The role a department manager gets.
+     * Department-specific manager roles.
+     */
+    public const DEPARTMENT_MANAGERS = [
+        'sales' => 'sales_manager',
+        'marketing' => 'marketing_manager',
+        'development' => 'development_manager',
+        'hr' => 'hr_manager',
+    ];
+
+    /**
+     * The generic fallback role a department manager gets if no department match.
      */
     public const MANAGER_ROLE = 'manager';
 
     /**
-     * All seeded roles. Only ADMIN_ROLE is wired up in this phase; the rest are
-     * created empty so their permission sets can be defined in later phases.
+     * Check if a given role name is a manager role.
+     */
+    public static function isManagerRole(?string $role): bool
+    {
+        if ($role === null || $role === '') {
+            return false;
+        }
+
+        return $role === self::MANAGER_ROLE
+            || in_array($role, self::DEPARTMENT_MANAGERS, true)
+            || str_ends_with($role, '_manager');
+    }
+
+    /**
+     * All seeded roles.
      */
     public const ROLES = [
         self::ADMIN_ROLE,
-        'manager',
+        'sales_manager',
+        'marketing_manager',
+        'development_manager',
+        'hr_manager',
         'sales',
         'marketing',
         'development',
         'hr',
+        'manager',
     ];
 
     /**
@@ -86,12 +113,28 @@ final class Rbac
         'invoices'           => ['view', 'create', 'edit', 'delete', 'export', 'send', 'cancel', 'payments.create', 'payments.delete'],
         'recurring_invoices' => ['view', 'create', 'edit', 'delete', 'export', 'toggle'],
         'followups'          => ['view', 'create', 'edit', 'delete'],
+        'team'               => ['view'],
+        'my_attendance'      => ['view'],
+        'my_leaves'          => ['view', 'create'],
+        'my_expenses'        => ['view', 'create'],
         'users'              => ['view', 'create', 'edit', 'delete'],
+        'payroll'            => ['view', 'create', 'edit', 'delete', 'export'],
+        'attendance'         => ['view', 'create', 'edit', 'delete', 'export'],
+        'leaves'             => ['view', 'create', 'edit', 'delete', 'approve', 'settings'],
+        'holidays'           => ['view', 'create', 'edit', 'delete'],
         // Departments: list, add, and change the manager. No delete, because
         // users.department stores the department name as a string.
         'departments'        => ['view', 'create', 'edit'],
+        'tasks'              => ['view', 'create', 'edit', 'delete'],
+        'content'            => ['view', 'create', 'edit', 'delete', 'assign', 'review', 'publish', 'brands', 'accounts', 'reports'],
+        'reports'            => ['costing', 'view', 'performance'],
         'settings'           => ['view'],
         'audit_logs'         => ['view'],
+        // The email trail. Read-only like audit_logs: a row is written by the
+        // queue, never edited by hand. No resend action here — re-sending is an
+        // invoice action and stays behind invoices.send.
+        'email_logs'         => ['view'],
+        'sales_tracking'     => ['view'],
     ];
 
     /**

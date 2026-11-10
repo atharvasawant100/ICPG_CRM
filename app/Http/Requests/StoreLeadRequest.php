@@ -27,7 +27,8 @@ class StoreLeadRequest extends FormRequest
             'phone' => 'nullable|string|max:255',
             'company' => 'nullable|string|max:255',
             'source' => 'nullable|string|max:255',
-            'status' => 'nullable|in:new,contacted,interested,qualified,converted,lost',
+            'status' => 'nullable|in:new,contacted,follow_up,interested,qualified,converted,won,lost',
+            'assigned_to' => 'nullable|exists:users,id',
         ];
     }
 }

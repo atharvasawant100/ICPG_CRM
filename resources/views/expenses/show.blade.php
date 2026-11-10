@@ -12,10 +12,14 @@
                 <div class="flex flex-wrap gap-2">
                     @if($expense->isPending())
                         <a href="{{ route('expenses.edit', $expense) }}"
-                            class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">Edit</a>
+                            class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            <span>Edit</span>
+                        </a>
                     @endif
-                    <a href="{{ route('expenses.index') }}"
-                        class="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200">Back</a>
+
                 </div>
             </div>
 
@@ -24,6 +28,18 @@
                     <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Category</label>
                     <p class="text-gray-800 dark:text-gray-100 font-medium">{{ $expense->category->name }}</p>
                 </div>
+
+                @if($expense->ai_tool)
+                    <div class="p-4 bg-gradient-to-br from-indigo-50/60 to-white dark:from-indigo-950/40 dark:to-gray-800 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                        <label class="block text-indigo-700 dark:text-indigo-300 text-sm font-semibold mb-2">AI Tool</label>
+                        <p class="text-indigo-900 dark:text-indigo-200 font-bold text-base flex items-center gap-2">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            {{ $expense->ai_tool }}
+                        </p>
+                    </div>
+                @endif
 
                 <div class="p-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-700/50 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600">
                     <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Amount</label>
@@ -65,8 +81,21 @@
 
 
                 <div class="p-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-700/50 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600">
-                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Created By</label>
-                    <p class="text-gray-800 dark:text-gray-100 font-medium">{{ $expense->user->name }}</p>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Claimed By (Employee)</label>
+                    <p class="text-gray-800 dark:text-gray-100 font-bold text-base flex items-center gap-2">
+                        <span>{{ $expense->user->name }}</span>
+                        @if($expense->user->emp_id)
+                            <span class="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200">
+                                {{ $expense->user->emp_id }}
+                            </span>
+                        @endif
+                    </p>
+                    @if($expense->user->designation || $expense->user->department)
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {{ $expense->user->designation ? ucwords($expense->user->designation) : '' }}
+                            {{ $expense->user->department ? '&bull; ' . ucfirst($expense->user->department) . ' Dept' : '' }}
+                        </p>
+                    @endif
                 </div>
 
                 <div class="p-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-700/50 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600">

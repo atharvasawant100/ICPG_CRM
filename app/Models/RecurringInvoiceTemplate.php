@@ -22,6 +22,7 @@ class RecurringInvoiceTemplate extends Model
         protected $fillable = [
         'name',
         'customer_id',
+        'brand',
         'frequency',
         'custom_interval_days',
         'start_date',

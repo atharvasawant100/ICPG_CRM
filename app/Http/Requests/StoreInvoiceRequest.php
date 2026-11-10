@@ -23,6 +23,7 @@ class StoreInvoiceRequest extends FormRequest
     {
         return [
             'customer_id' => 'required|exists:customers,id',
+            'brand' => 'nullable|string|max:255',
             'invoice_date' => 'required|date',
             'due_date' => 'required|date|after_or_equal:invoice_date|after_or_equal:today',
             'items' => 'required|array|min:1|max:1000',
