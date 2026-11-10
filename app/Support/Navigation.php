@@ -62,6 +62,11 @@ final class Navigation
             }
         }
 
+        // Social Media module Publishing Queue: accessible with publish or edit permissions
+        if ($permission === 'content.publish') {
+            return $user->can('content.publish') || $user->can('content.edit') || $user->isManager() || $user->isAdmin();
+        }
+
         if ($user->isAdmin()) {
             // Admins do not have employee self-service attendance, leaves, or personal expense claims
             if (in_array($permission, ['my_attendance.view', 'my_leaves.view', 'my_expenses.view'], true)) {

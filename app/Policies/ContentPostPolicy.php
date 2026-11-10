@@ -96,7 +96,7 @@ class ContentPostPolicy extends BasePolicy
 
     public function publish(User $user, ContentPost $post): bool
     {
-        if ($user->isAdmin() || $this->permitted($user, 'content.publish')) {
+        if ($user->isAdmin() || $this->permitted($user, 'content.publish') || $this->permitted($user, 'content.edit')) {
             return true;
         }
 
