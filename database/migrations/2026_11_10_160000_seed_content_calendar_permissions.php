@@ -60,3 +60,4 @@ return new class extends Migration
         // Keep permissions on down
     }
 };
+

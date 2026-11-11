@@ -202,17 +202,134 @@
                 </div>
             </div>
 
-            <!-- Project Filter -->
-            <div>
+            <!-- Project Filter (Searchable) -->
+            @php
+                $selectedProjId = (string) request('project_id', '');
+                $selectedProjModel = $selectedProjId !== '' ? $projects->firstWhere('id', $selectedProjId) : null;
+                $selectedProjTitle = $selectedProjModel ? ($selectedProjModel->title ?? $selectedProjModel->name) : 'All Projects';
+                $projectsJsonData = $projects->map(fn($p) => [
+                    'id' => (string) $p->id,
+                    'title' => (string) ($p->title ?? $p->name ?? ('Project #' . $p->id)),
+                    'department' => (string) ($p->department ?? '')
+                ])->values();
+            @endphp
+            <div class="relative" x-data="{
+                open: false,
+                search: '',
+                selectedId: @js($selectedProjId),
+                selectedLabel: @js($selectedProjTitle),
+                allProjects: @js($projectsJsonData),
+                get filteredProjects() {
+                    if (!this.search.trim()) return this.allProjects;
+                    const q = this.search.toLowerCase().trim();
+                    return this.allProjects.filter(p => p.title.toLowerCase().includes(q) || (p.department && p.department.toLowerCase().includes(q)));
+                },
+                select(id, label) {
+                    this.selectedId = id;
+                    this.selectedLabel = label;
+                    this.open = false;
+                    this.search = '';
+                },
+                clear() {
+                    this.selectedId = '';
+                    this.selectedLabel = 'All Projects';
+                    this.open = false;
+                    this.search = '';
+                }
+            }" @click.outside="open = false" @keydown.escape.window="open = false">
+                <input type="hidden" name="project_id" :value="selectedId" value="{{ $selectedProjId }}">
+
                 <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Project</label>
-                <select name="project_id" class="w-full py-2 px-3 text-xs sm:text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500">
-                    <option value="">All Projects</option>
-                    @foreach ($projects as $proj)
-                        <option value="{{ $proj->id }}" {{ request('project_id') == $proj->id ? 'selected' : '' }}>
-                            {{ $proj->title ?? $proj->name }}
-                        </option>
-                    @endforeach
-                </select>
+
+                <!-- Trigger Button -->
+                <button type="button"
+                    @click="open = !open; if(open) { $nextTick(() => $refs.projectSearchInput.focus()); }"
+                    class="w-full py-2 px-3 text-xs sm:text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500 flex items-center justify-between gap-1 text-left transition-colors hover:border-gray-300 dark:hover:border-gray-600">
+                    <span class="truncate" :class="selectedId ? 'font-semibold text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'" x-text="selectedLabel">
+                        {{ $selectedProjTitle }}
+                    </span>
+                    <div class="flex items-center gap-1 shrink-0 text-gray-400">
+                        <template x-if="selectedId">
+                            <span @click.stop="clear()" class="hover:text-red-500 cursor-pointer p-0.5" title="Clear selection">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </span>
+                        </template>
+                        <svg class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Dropdown Menu -->
+                <div x-show="open"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="absolute left-0 top-full mt-1 w-64 sm:w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                    
+                    <!-- Search Input in Dropdown -->
+                    <div class="p-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                        <div class="relative">
+                            <input type="text"
+                                x-ref="projectSearchInput"
+                                x-model="search"
+                                placeholder="Type to search projects..."
+                                @keydown.enter.prevent="if (filteredProjects.length === 1) { select(filteredProjects[0].id, filteredProjects[0].title); } else if (filteredProjects.length > 0 && !search.trim()) { select('', 'All Projects'); }"
+                                class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <button type="button" x-show="search" @click="search = ''; $refs.projectSearchInput.focus()" class="absolute right-2 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs">
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Options List -->
+                    <div class="max-h-60 overflow-y-auto py-1 text-xs divide-y divide-gray-50 dark:divide-gray-800">
+                        <!-- All Projects option -->
+                        <button type="button"
+                            @click="select('', 'All Projects')"
+                            class="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                            :class="!selectedId ? 'bg-indigo-50/60 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300'">
+                            <span class="flex items-center gap-2">
+                                <span class="text-gray-400">🌐</span>
+                                <span>All Projects</span>
+                            </span>
+                            <span x-show="!selectedId" class="text-indigo-600 dark:text-indigo-400 font-bold">✓</span>
+                        </button>
+
+                        <!-- Project list items -->
+                        <template x-for="project in filteredProjects" :key="project.id">
+                            <button type="button"
+                                @click="select(project.id, project.title)"
+                                class="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                                :class="selectedId == project.id ? 'bg-indigo-50/60 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300'">
+                                <div class="truncate pr-2">
+                                    <div class="truncate font-medium" x-text="project.title"></div>
+                                    <template x-if="project.department">
+                                        <div class="text-[10px] text-gray-400 capitalize" x-text="project.department"></div>
+                                    </template>
+                                </div>
+                                <span x-show="selectedId == project.id" class="text-indigo-600 dark:text-indigo-400 font-bold shrink-0">✓</span>
+                            </button>
+                        </template>
+
+                        <!-- Empty State -->
+                        <div x-show="filteredProjects.length === 0" class="px-3 py-4 text-center text-gray-400">
+                            <svg class="w-5 h-5 mx-auto mb-1 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-[11px]">No projects matching "<span class="font-medium text-gray-600 dark:text-gray-300" x-text="search"></span>"</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Status Filter -->
